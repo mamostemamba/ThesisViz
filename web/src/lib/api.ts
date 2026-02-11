@@ -107,3 +107,15 @@ export async function renderCode(data: RenderRequest) {
     body: JSON.stringify(data),
   });
 }
+
+// Export full .tex for Overleaf
+export async function exportTeX(data: {
+  code: string;
+  language?: string;
+  color_scheme?: string;
+}) {
+  return apiFetch<{ tex: string }>("/api/v1/export/tex", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}

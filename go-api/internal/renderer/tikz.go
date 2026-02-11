@@ -18,10 +18,9 @@ const defaultColors = `\definecolor{accent1}{RGB}{70,130,180}
 \definecolor{bgcolor}{RGB}{245,245,250}`
 
 const texTemplate = `\documentclass[border=20pt]{standalone}
-\usepackage[utf8]{inputenc}
 \usepackage{tikz}
 %s
-\usetikzlibrary{arrows.meta,shapes.geometric,positioning,calc,fit,backgrounds,shadows}
+\usetikzlibrary{arrows.meta,shapes.geometric,shapes.multipart,positioning,calc,fit,backgrounds,shadows,decorations.pathmorphing,decorations.pathreplacing,decorations.markings,patterns,matrix,chains,scopes}
 %s
 \begin{document}
 %s

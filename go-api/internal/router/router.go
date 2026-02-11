@@ -58,6 +58,7 @@ func Setup(deps Deps) *gin.Engine {
 		// Render
 		if deps.RenderHandler != nil {
 			v1.POST("/render", deps.RenderHandler.Render)
+			v1.POST("/export/tex", deps.RenderHandler.ExportTeX)
 		}
 	}
 
