@@ -1,18 +1,44 @@
-source_for_review/
-
+# === OS ===
 .DS_Store
+Thumbs.db
+
+# === IDE ===
 .vscode/
 .idea/
 
+# === Go ===
+go-api/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# === Node / Next.js ===
 node_modules/
 .next/
+out/
 dist/
 build/
+
+# === Python ===
 venv/
+.venv/
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
 
+# === Environment ===
 .env
 .env.local
+.env.*.local
 *.pem
 *.key
+
+# === Docker ===
+docker-compose.override.yml
+
+# === Project ===
+source_for_review/
+.claude
