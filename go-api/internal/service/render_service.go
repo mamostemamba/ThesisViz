@@ -68,10 +68,10 @@ func (s *RenderService) RenderCode(ctx context.Context, req RenderCodeRequest) (
 		Timeout:  req.Timeout,
 	}
 
-	// Apply color scheme colors for TikZ
-	if req.Format == "tikz" && req.ColorScheme != "" {
-		scheme := colorscheme.Get(req.ColorScheme)
-		opts.Colors = scheme.TikZColors
+	// Apply color scheme colors for TikZ — always include all drawio colors
+	// plus the selected scheme's accent colors so any code compiles
+	if req.Format == "tikz" {
+		opts.Colors = colorscheme.AllTikZColors(req.ColorScheme)
 	}
 
 	// Render

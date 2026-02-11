@@ -100,6 +100,20 @@ func Get(name string) Scheme {
 	return schemes["drawio"]
 }
 
+// AllTikZColors returns a combined color definition block that includes
+// drawio colors (always) plus the accent colors from the selected scheme.
+// This ensures code generated with any scheme compiles regardless of sidebar selection.
+func AllTikZColors(selected string) string {
+	drawio := schemes["drawio"].TikZColors
+
+	s := Get(selected)
+	if selected == "drawio" || selected == "" {
+		return drawio
+	}
+	// drawio names (drawBlueFill etc.) never conflict with accent names
+	return drawio + "\n" + s.TikZColors
+}
+
 // Names returns all available scheme names.
 func Names() []string {
 	out := make([]string, 0, len(schemes))
