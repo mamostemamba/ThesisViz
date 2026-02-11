@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExpertToolbox } from "@/components/workspace/ExpertToolbox";
 
 export default function ProjectPage() {
   return (
@@ -48,17 +49,7 @@ export default function ProjectPage() {
             </TabsContent>
 
             <TabsContent value="expert" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Expert Toolbox</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Direct code editing and advanced rendering options coming
-                    soon.
-                  </p>
-                </CardContent>
-              </Card>
+              <ExpertToolbox />
             </TabsContent>
           </Tabs>
         </main>

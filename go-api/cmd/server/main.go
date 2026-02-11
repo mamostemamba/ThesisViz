@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/redis/go-redis/v9"
@@ -9,8 +10,13 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/thesisviz/go-api/internal/config"
+	"github.com/thesisviz/go-api/internal/handler"
 	"github.com/thesisviz/go-api/internal/model"
+	"github.com/thesisviz/go-api/internal/renderer"
+	"github.com/thesisviz/go-api/internal/repo"
 	"github.com/thesisviz/go-api/internal/router"
+	"github.com/thesisviz/go-api/internal/service"
+	"github.com/thesisviz/go-api/internal/storage"
 )
 
 func main() {
@@ -50,8 +56,51 @@ func main() {
 		rdb = redis.NewClient(opt)
 	}
 
+	// MinIO
+	store, err := storage.NewMinIOStorage(
+		cfg.MinioEndpoint,
+		cfg.MinioAccessKey,
+		cfg.MinioSecretKey,
+		cfg.MinioBucket,
+		cfg.MinioUseSSL,
+	)
+	if err != nil {
+		logger.Fatal("failed to init minio", zap.Error(err))
+	}
+	if err := store.EnsureBucket(context.Background()); err != nil {
+		logger.Warn("failed to ensure minio bucket (will retry on first upload)", zap.Error(err))
+	} else {
+		logger.Info("minio bucket ready", zap.String("bucket", cfg.MinioBucket))
+	}
+
+	// Repos
+	projectRepo := repo.NewProjectRepo(db)
+	generationRepo := repo.NewGenerationRepo(db)
+
+	// Services
+	projectSvc := service.NewProjectService(projectRepo)
+	generationSvc := service.NewGenerationService(generationRepo)
+
+	// Renderers
+	tikzRenderer := renderer.NewTikZRenderer()
+	matplotlibRenderer := renderer.NewMatplotlibRenderer(cfg.PyRenderURL)
+
+	renderSvc := service.NewRenderService(tikzRenderer, matplotlibRenderer, store, generationSvc)
+
+	// Handlers
+	projectHandler := handler.NewProjectHandler(projectSvc)
+	generationHandler := handler.NewGenerationHandler(generationSvc, store)
+	renderHandler := handler.NewRenderHandler(renderSvc)
+
 	// Router
-	r := router.Setup(db, rdb)
+	r := router.Setup(router.Deps{
+		DB:                db,
+		Redis:             rdb,
+		Storage:           store,
+		ProjectHandler:    projectHandler,
+		GenerationHandler: generationHandler,
+		RenderHandler:     renderHandler,
+	})
 
 	// Start
 	addr := ":" + cfg.GoAPIPort
