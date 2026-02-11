@@ -14,7 +14,7 @@ api:
 
 # Start Python render sidecar (port 8081)
 render:
-	cd py-render && python3.12 -m uvicorn main:app --host 0.0.0.0 --port 8081 --reload
+	cd py-render && python3.13 -m uvicorn main:app --host 0.0.0.0 --port 8081 --reload
 
 # Start Next.js frontend (port 3000)
 web:
@@ -29,6 +29,6 @@ dev:
 	@echo "Starting Go API, Python Render, and Next.js..."
 	@trap 'kill 0' EXIT; \
 		(cd go-api && go run ./cmd/server) & \
-		(cd py-render && python3.12 -m uvicorn main:app --host 0.0.0.0 --port 8081 --reload) & \
+		(cd py-render && python3.13 -m uvicorn main:app --host 0.0.0.0 --port 8081 --reload) & \
 		(cd web && npm run dev) & \
 		wait
