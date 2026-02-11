@@ -19,8 +19,16 @@ Generate TikZ code for architecture diagrams, network topologies, and module rel
 CRITICAL RULES:
 - Output ONLY the TikZ code (everything between \begin{tikzpicture} and \end{tikzpicture}, inclusive).
 - Do NOT include \documentclass, \usepackage, \begin{document}, or any preamble.
-- Do NOT use \definecolor or "define color" inside the tikzpicture environment. All colors are ALREADY defined in the preamble. Just USE them directly (e.g., fill=drawBlueFill, draw=drawBlueLine).
+- Do NOT use \definecolor or "define color" inside the tikzpicture environment. All colors are ALREADY defined in the preamble. Just USE them directly.
 - Do NOT wrap the output in markdown code fences.
+- You MUST use these unified semantic color names for nodes and edges:
+    fill=primaryFill, draw=primaryLine (main elements)
+    fill=secondaryFill, draw=secondaryLine (secondary elements)
+    fill=tertiaryFill, draw=tertiaryLine (tertiary elements)
+    fill=quaternaryFill, draw=quaternaryLine (fourth category)
+    fill=highlightFill, draw=highlightLine (emphasis / alerts)
+    fill=neutralFill, draw=neutralLine (backgrounds / borders)
+  These names are remapped by the user's color scheme so the same code renders in different palettes.
 
 Layout rules:
 - The diagram MUST fit within 14cm width. Use "text width=2.5cm" on nodes if needed.
