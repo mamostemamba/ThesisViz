@@ -36,6 +36,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
   const language = useSettingsStore((s) => s.language);
   const format = useSettingsStore((s) => s.format);
   const colorScheme = useSettingsStore((s) => s.colorScheme);
+  const customColors = useSettingsStore((s) => s.customColors);
   const model = useSettingsStore((s) => s.model);
 
   const taskId = useGenerateStore((s) => s.taskId);
@@ -119,6 +120,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
           prompt,
           language,
           color_scheme: colorScheme,
+          custom_colors: colorScheme === "custom" && customColors ? customColors : undefined,
           thesis_title: thesisTitle || undefined,
           thesis_abstract: thesisAbstract || undefined,
           model,
@@ -173,6 +175,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
       format,
       language,
       colorScheme,
+      customColors,
       thesisTitle,
       thesisAbstract,
       model,

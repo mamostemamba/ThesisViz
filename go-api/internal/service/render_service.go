@@ -11,6 +11,7 @@ import (
 	"github.com/thesisviz/go-api/pkg/colorscheme"
 )
 
+
 type RenderService struct {
 	tikz       renderer.Renderer
 	matplotlib renderer.Renderer
@@ -33,13 +34,14 @@ func NewRenderService(
 }
 
 type RenderCodeRequest struct {
-	Code         string `json:"code"`
-	Format       string `json:"format"`       // "tikz" or "matplotlib"
-	Language     string `json:"language"`      // "en" or "zh"
-	ColorScheme  string `json:"color_scheme"`  // e.g. "drawio", "academic_blue"
-	GenerationID string `json:"generation_id"` // optional: update existing generation
-	DPI          int    `json:"dpi"`
-	Timeout      int    `json:"timeout"`
+	Code         string                   `json:"code"`
+	Format       string                   `json:"format"`        // "tikz" or "matplotlib"
+	Language     string                   `json:"language"`       // "en" or "zh"
+	ColorScheme  string                   `json:"color_scheme"`   // e.g. "drawio", "professional_blue"
+	CustomColors *colorscheme.CustomColors `json:"custom_colors"` // optional: overrides ColorScheme
+	GenerationID string                   `json:"generation_id"`  // optional: update existing generation
+	DPI          int                      `json:"dpi"`
+	Timeout      int                      `json:"timeout"`
 }
 
 type RenderCodeResponse struct {
@@ -71,7 +73,11 @@ func (s *RenderService) RenderCode(ctx context.Context, req RenderCodeRequest) (
 	// Apply color scheme colors for TikZ — always include all drawio colors
 	// plus the selected scheme's accent colors so any code compiles
 	if req.Format == "tikz" {
-		opts.Colors = colorscheme.AllTikZColors(req.ColorScheme)
+		if req.CustomColors != nil {
+			opts.Colors = colorscheme.AllTikZColorsCustom(*req.CustomColors)
+		} else {
+			opts.Colors = colorscheme.AllTikZColors(req.ColorScheme)
+		}
 	}
 
 	// Render

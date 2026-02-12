@@ -6,7 +6,6 @@ import (
 
 	"github.com/thesisviz/go-api/internal/llm"
 	"github.com/thesisviz/go-api/internal/prompt"
-	"github.com/thesisviz/go-api/pkg/colorscheme"
 )
 
 type MatplotlibAgent struct {
@@ -20,7 +19,7 @@ func NewMatplotlibAgent(llm *llm.GeminiClient) *MatplotlibAgent {
 func (a *MatplotlibAgent) Format() string { return "matplotlib" }
 
 func (a *MatplotlibAgent) Generate(ctx context.Context, userPrompt string, opts AgentOpts) (string, error) {
-	scheme := colorscheme.Get(opts.ColorScheme)
+	scheme := opts.ResolveScheme()
 	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
 	sysPrompt := prompt.Matplotlib(opts.Language, scheme.TikZPrompt, scheme.MatplotlibColors, identity)
 
@@ -32,7 +31,7 @@ func (a *MatplotlibAgent) Generate(ctx context.Context, userPrompt string, opts 
 }
 
 func (a *MatplotlibAgent) Refine(ctx context.Context, code, modification string, opts AgentOpts) (string, error) {
-	scheme := colorscheme.Get(opts.ColorScheme)
+	scheme := opts.ResolveScheme()
 	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
 	sysPrompt := prompt.Matplotlib(opts.Language, scheme.TikZPrompt, scheme.MatplotlibColors, identity)
 
@@ -46,7 +45,7 @@ func (a *MatplotlibAgent) Refine(ctx context.Context, code, modification string,
 }
 
 func (a *MatplotlibAgent) RefineWithImage(ctx context.Context, code, modification string, img []byte, opts AgentOpts) (string, error) {
-	scheme := colorscheme.Get(opts.ColorScheme)
+	scheme := opts.ResolveScheme()
 	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
 	sysPrompt := prompt.Matplotlib(opts.Language, scheme.TikZPrompt, scheme.MatplotlibColors, identity)
 

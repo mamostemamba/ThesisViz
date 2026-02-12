@@ -12,6 +12,7 @@ import (
 	"github.com/thesisviz/go-api/internal/service"
 	"github.com/thesisviz/go-api/internal/storage"
 	"github.com/thesisviz/go-api/internal/ws"
+	"github.com/thesisviz/go-api/pkg/colorscheme"
 )
 
 const (
@@ -68,14 +69,15 @@ func (h *GenerateHandler) Analyze(c *gin.Context) {
 }
 
 type createRequest struct {
-	ProjectID      string `json:"project_id"`
-	Format         string `json:"format" binding:"required"`
-	Prompt         string `json:"prompt" binding:"required"`
-	Language       string `json:"language"`
-	ColorScheme    string `json:"color_scheme"`
-	ThesisTitle    string `json:"thesis_title"`
-	ThesisAbstract string `json:"thesis_abstract"`
-	Model          string `json:"model"`
+	ProjectID      string                   `json:"project_id"`
+	Format         string                   `json:"format" binding:"required"`
+	Prompt         string                   `json:"prompt" binding:"required"`
+	Language       string                   `json:"language"`
+	ColorScheme    string                   `json:"color_scheme"`
+	CustomColors   *colorscheme.CustomColors `json:"custom_colors,omitempty"`
+	ThesisTitle    string                   `json:"thesis_title"`
+	ThesisAbstract string                   `json:"thesis_abstract"`
+	Model          string                   `json:"model"`
 }
 
 // Create handles POST /api/v1/generate/create
@@ -111,6 +113,7 @@ func (h *GenerateHandler) Create(c *gin.Context) {
 			Prompt:         req.Prompt,
 			Language:       req.Language,
 			ColorScheme:    req.ColorScheme,
+			CustomColors:   req.CustomColors,
 			ThesisTitle:    req.ThesisTitle,
 			ThesisAbstract: req.ThesisAbstract,
 			Model:          req.Model,
@@ -130,11 +133,12 @@ func (h *GenerateHandler) Create(c *gin.Context) {
 }
 
 type refineRequestBody struct {
-	GenerationID string `json:"generation_id" binding:"required"`
-	Modification string `json:"modification" binding:"required"`
-	Language     string `json:"language"`
-	ColorScheme  string `json:"color_scheme"`
-	Model        string `json:"model"`
+	GenerationID string                   `json:"generation_id" binding:"required"`
+	Modification string                   `json:"modification" binding:"required"`
+	Language     string                   `json:"language"`
+	ColorScheme  string                   `json:"color_scheme"`
+	CustomColors *colorscheme.CustomColors `json:"custom_colors,omitempty"`
+	Model        string                   `json:"model"`
 }
 
 // Refine handles POST /api/v1/generate/refine
@@ -166,6 +170,7 @@ func (h *GenerateHandler) Refine(c *gin.Context) {
 			Modification: req.Modification,
 			Language:     req.Language,
 			ColorScheme:  req.ColorScheme,
+			CustomColors: req.CustomColors,
 			Model:        req.Model,
 		}, pushFn)
 

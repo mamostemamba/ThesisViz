@@ -97,6 +97,7 @@ func main() {
 
 	// LLM + Agents (optional — only if GEMINI_API_KEY is set)
 	var generateHandler *handler.GenerateHandler
+	var colorExtractHandler *handler.ColorExtractHandler
 	var wsHandler *handler.WSHandler
 
 	if cfg.GeminiAPIKey != "" {
@@ -117,6 +118,7 @@ func main() {
 
 		wsHub := ws.NewHub(logger)
 		generateHandler = handler.NewGenerateHandler(agentSvc, generationSvc, store, wsHub, logger)
+		colorExtractHandler = handler.NewColorExtractHandler(geminiClient, logger)
 		wsHandler = handler.NewWSHandler(wsHub, logger)
 	} else {
 		logger.Warn("GEMINI_API_KEY not set — AI generation endpoints disabled")
@@ -127,11 +129,12 @@ func main() {
 		DB:                db,
 		Redis:             rdb,
 		Storage:           store,
-		ProjectHandler:    projectHandler,
-		GenerationHandler: generationHandler,
-		RenderHandler:     renderHandler,
-		GenerateHandler:   generateHandler,
-		WSHandler:         wsHandler,
+		ProjectHandler:      projectHandler,
+		GenerationHandler:   generationHandler,
+		RenderHandler:       renderHandler,
+		GenerateHandler:     generateHandler,
+		ColorExtractHandler: colorExtractHandler,
+		WSHandler:           wsHandler,
 	})
 
 	// Start

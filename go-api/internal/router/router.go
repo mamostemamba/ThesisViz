@@ -15,11 +15,12 @@ type Deps struct {
 	Redis   *redis.Client
 	Storage *storage.MinIOStorage
 
-	ProjectHandler    *handler.ProjectHandler
-	GenerationHandler *handler.GenerationHandler
-	RenderHandler     *handler.RenderHandler
-	GenerateHandler   *handler.GenerateHandler
-	WSHandler         *handler.WSHandler
+	ProjectHandler      *handler.ProjectHandler
+	GenerationHandler   *handler.GenerationHandler
+	RenderHandler       *handler.RenderHandler
+	GenerateHandler     *handler.GenerateHandler
+	ColorExtractHandler *handler.ColorExtractHandler
+	WSHandler           *handler.WSHandler
 }
 
 func Setup(deps Deps) *gin.Engine {
@@ -69,6 +70,11 @@ func Setup(deps Deps) *gin.Engine {
 			v1.POST("/generate/create", deps.GenerateHandler.Create)
 			v1.POST("/generate/refine", deps.GenerateHandler.Refine)
 			v1.GET("/generate/:id", deps.GenerateHandler.Get)
+		}
+
+		// Color extraction
+		if deps.ColorExtractHandler != nil {
+			v1.POST("/colors/extract", deps.ColorExtractHandler.Extract)
 		}
 
 		// WebSocket

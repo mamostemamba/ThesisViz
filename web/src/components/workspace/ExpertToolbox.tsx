@@ -29,6 +29,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
   const format = useSettingsStore((s) => s.format);
   const language = useSettingsStore((s) => s.language);
   const colorScheme = useSettingsStore((s) => s.colorScheme);
+  const customColors = useSettingsStore((s) => s.customColors);
   const model = useSettingsStore((s) => s.model);
 
   const renderMutation = useRender();
@@ -75,6 +76,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
         format,
         language,
         color_scheme: colorScheme,
+        custom_colors: colorScheme === "custom" && customColors ? customColors : undefined,
       });
 
       if (result.status === "ok" && result.image_url) {
@@ -91,7 +93,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
       setIsRendering(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, format, language, colorScheme]);
+  }, [code, format, language, colorScheme, customColors]);
 
   // Auto-render when color scheme changes (only if we've already rendered once)
   useEffect(() => {
@@ -112,6 +114,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
         code,
         language,
         color_scheme: colorScheme,
+        custom_colors: colorScheme === "custom" && customColors ? customColors : undefined,
       });
       await navigator.clipboard.writeText(result.tex);
       setCopied(true);
@@ -138,6 +141,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
         prompt: aiPrompt,
         language,
         color_scheme: colorScheme,
+        custom_colors: colorScheme === "custom" && customColors ? customColors : undefined,
         model,
       });
 
@@ -175,7 +179,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
       );
       setAiGenerating(false);
     }
-  }, [aiPrompt, projectId, format, language, colorScheme, model, setCode, setImageUrl]);
+  }, [aiPrompt, projectId, format, language, colorScheme, customColors, model, setCode, setImageUrl]);
 
   return (
     <div className="flex h-[calc(100vh-10rem)] flex-col gap-3">

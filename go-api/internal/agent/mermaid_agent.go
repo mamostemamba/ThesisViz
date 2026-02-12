@@ -6,7 +6,6 @@ import (
 
 	"github.com/thesisviz/go-api/internal/llm"
 	"github.com/thesisviz/go-api/internal/prompt"
-	"github.com/thesisviz/go-api/pkg/colorscheme"
 )
 
 type MermaidAgent struct {
@@ -20,7 +19,7 @@ func NewMermaidAgent(llm *llm.GeminiClient) *MermaidAgent {
 func (a *MermaidAgent) Format() string { return "mermaid" }
 
 func (a *MermaidAgent) Generate(ctx context.Context, userPrompt string, opts AgentOpts) (string, error) {
-	scheme := colorscheme.Get(opts.ColorScheme)
+	scheme := opts.ResolveScheme()
 	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
 	sysPrompt := prompt.Mermaid(opts.Language, scheme.TikZPrompt, identity)
 
@@ -32,7 +31,7 @@ func (a *MermaidAgent) Generate(ctx context.Context, userPrompt string, opts Age
 }
 
 func (a *MermaidAgent) Refine(ctx context.Context, code, modification string, opts AgentOpts) (string, error) {
-	scheme := colorscheme.Get(opts.ColorScheme)
+	scheme := opts.ResolveScheme()
 	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
 	sysPrompt := prompt.Mermaid(opts.Language, scheme.TikZPrompt, identity)
 

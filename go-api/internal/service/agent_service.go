@@ -14,6 +14,7 @@ import (
 	"github.com/thesisviz/go-api/internal/model"
 	"github.com/thesisviz/go-api/internal/prompt"
 	"github.com/thesisviz/go-api/internal/storage"
+	"github.com/thesisviz/go-api/pkg/colorscheme"
 )
 
 const (
@@ -52,6 +53,7 @@ type GenerateRequest struct {
 	Prompt         string
 	Language       string
 	ColorScheme    string
+	CustomColors   *colorscheme.CustomColors
 	ThesisTitle    string
 	ThesisAbstract string
 	Model          string
@@ -62,6 +64,7 @@ type RefineRequest struct {
 	Modification string
 	Language     string
 	ColorScheme  string
+	CustomColors *colorscheme.CustomColors
 	Model        string
 }
 
@@ -146,6 +149,7 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 	opts := agent.AgentOpts{
 		Language:       req.Language,
 		ColorScheme:    req.ColorScheme,
+		CustomColors:   req.CustomColors,
 		ThesisTitle:    req.ThesisTitle,
 		ThesisAbstract: req.ThesisAbstract,
 		Model:          req.Model,
@@ -262,10 +266,11 @@ func (s *AgentService) compileWithRetries(
 		}
 
 		renderResp, renderErr := s.renderSvc.RenderCode(ctx, RenderCodeRequest{
-			Code:        code,
-			Format:      req.Format,
-			Language:    req.Language,
-			ColorScheme: req.ColorScheme,
+			Code:         code,
+			Format:       req.Format,
+			Language:     req.Language,
+			ColorScheme:  req.ColorScheme,
+			CustomColors: req.CustomColors,
 		})
 		if renderErr != nil || renderResp.Status == "error" {
 			errMsg := "unknown render error"
@@ -467,7 +472,7 @@ func (s *AgentService) visualReview(
 			Round: reroll, Code: newCode,
 		}})
 
-		rURL, rKey, rBytes, renderErr := s.renderAndGetBytes(ctx, newCode, req.Format, req.Language, req.ColorScheme)
+		rURL, rKey, rBytes, renderErr := s.renderAndGetBytes(ctx, newCode, req.Format, req.Language, req.ColorScheme, req.CustomColors)
 		if renderErr != nil {
 			s.logger.Warn("reroll render failed", zap.Int("reroll", reroll), zap.Error(renderErr))
 			pushFn(ProgressMsg{Type: "preview", Phase: "rerolling", Data: ProgressData{
@@ -579,7 +584,7 @@ func (s *AgentService) visualReview(
 		code = newCode
 
 		// Re-render
-		fURL, fKey, fBytes, renderErr := s.renderAndGetBytes(ctx, code, req.Format, req.Language, req.ColorScheme)
+		fURL, fKey, fBytes, renderErr := s.renderAndGetBytes(ctx, code, req.Format, req.Language, req.ColorScheme, req.CustomColors)
 		if renderErr != nil {
 			s.logger.Warn("fix render failed", zap.Int("fix", fix), zap.Error(renderErr))
 			pushFn(ProgressMsg{Type: "preview", Phase: "fixing", Data: ProgressData{
@@ -659,12 +664,13 @@ func (s *AgentService) Refine(ctx context.Context, req RefineRequest, pushFn fun
 
 	// Use the full generate pipeline with the refine as a new prompt
 	result, err := s.Generate(ctx, GenerateRequest{
-		ProjectID:   gen.ProjectID.String(),
-		Format:      gen.Format,
-		Prompt:      fmt.Sprintf("Modify this existing code:\n\n%s\n\nModification: %s", *gen.Code, req.Modification),
-		Language:    req.Language,
-		ColorScheme: req.ColorScheme,
-		Model:       req.Model,
+		ProjectID:    gen.ProjectID.String(),
+		Format:       gen.Format,
+		Prompt:       fmt.Sprintf("Modify this existing code:\n\n%s\n\nModification: %s", *gen.Code, req.Modification),
+		Language:     req.Language,
+		ColorScheme:  req.ColorScheme,
+		CustomColors: req.CustomColors,
+		Model:        req.Model,
 	}, pushFn)
 	if err != nil {
 		return nil, err
@@ -744,12 +750,13 @@ func (s *AgentService) markFailed(gen *model.Generation) {
 }
 
 // renderAndGetBytes is a helper to render and also download the image bytes.
-func (s *AgentService) renderAndGetBytes(ctx context.Context, code, format, language, colorScheme string) (imageURL, imageKey string, imageBytes []byte, err error) {
+func (s *AgentService) renderAndGetBytes(ctx context.Context, code, format, language, colorScheme string, customColors *colorscheme.CustomColors) (imageURL, imageKey string, imageBytes []byte, err error) {
 	resp, err := s.renderSvc.RenderCode(ctx, RenderCodeRequest{
-		Code:        code,
-		Format:      format,
-		Language:    language,
-		ColorScheme: colorScheme,
+		Code:         code,
+		Format:       format,
+		Language:     language,
+		ColorScheme:  colorScheme,
+		CustomColors: customColors,
 	})
 	if err != nil {
 		return "", "", nil, err

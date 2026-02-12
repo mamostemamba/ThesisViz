@@ -13,6 +13,7 @@ import type {
   GenerateCreateResponse,
   GenerateRefineRequest,
   GenerateRefineResponse,
+  ExtractColorsResponse,
 } from "@/types/api";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -119,6 +120,7 @@ export async function exportTeX(data: {
   code: string;
   language?: string;
   color_scheme?: string;
+  custom_colors?: import("@/types/api").CustomColors;
 }) {
   return apiFetch<{ tex: string }>("/api/v1/export/tex", {
     method: "POST",
@@ -150,4 +152,19 @@ export async function generateRefine(data: GenerateRefineRequest) {
 
 export async function getGenerationDetail(id: string) {
   return apiFetch<Generation>(`/api/v1/generate/${id}`);
+}
+
+// Color extraction
+export async function extractColors(file: File): Promise<ExtractColorsResponse> {
+  const formData = new FormData();
+  formData.append("image", file);
+  const res = await fetch(`${BASE_URL}/api/v1/colors/extract`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`API error ${res.status}: ${body}`);
+  }
+  return res.json();
 }

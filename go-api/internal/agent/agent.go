@@ -1,6 +1,10 @@
 package agent
 
-import "context"
+import (
+	"context"
+
+	"github.com/thesisviz/go-api/pkg/colorscheme"
+)
 
 // defaultTemperature is the LLM temperature used for code generation.
 const defaultTemperature float32 = 0.4
@@ -21,9 +25,18 @@ type Agent interface {
 type AgentOpts struct {
 	Language       string
 	ColorScheme    string
+	CustomColors   *colorscheme.CustomColors
 	ThesisTitle    string
 	ThesisAbstract string
 	Model          string
+}
+
+// ResolveScheme returns the appropriate Scheme — from CustomColors if set, otherwise from the preset.
+func (o AgentOpts) ResolveScheme() colorscheme.Scheme {
+	if o.CustomColors != nil {
+		return colorscheme.FromCustom(*o.CustomColors)
+	}
+	return colorscheme.Get(o.ColorScheme)
 }
 
 // buildIdentity constructs a thesis identity string from title and abstract.

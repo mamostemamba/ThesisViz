@@ -32,11 +32,21 @@ export interface PaginatedResponse<T> {
   page_size: number;
 }
 
+export interface ColorPair {
+  fill: string;
+  line: string;
+}
+
+export interface CustomColors {
+  pairs: ColorPair[];
+}
+
 export interface RenderRequest {
   code: string;
   format: string;
   language?: string;
   color_scheme?: string;
+  custom_colors?: CustomColors;
   generation_id?: string;
   dpi?: number;
   timeout?: number;
@@ -94,6 +104,7 @@ export interface GenerateCreateRequest {
   prompt: string;
   language?: string;
   color_scheme?: string;
+  custom_colors?: CustomColors;
   thesis_title?: string;
   thesis_abstract?: string;
   model?: string;
@@ -108,9 +119,14 @@ export interface GenerateRefineRequest {
   modification: string;
   language?: string;
   color_scheme?: string;
+  custom_colors?: CustomColors;
   model?: string;
 }
 
 export interface GenerateRefineResponse {
   task_id: string;
+}
+
+export interface ExtractColorsResponse {
+  colors: CustomColors;
 }

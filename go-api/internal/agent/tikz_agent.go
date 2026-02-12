@@ -6,7 +6,6 @@ import (
 
 	"github.com/thesisviz/go-api/internal/llm"
 	"github.com/thesisviz/go-api/internal/prompt"
-	"github.com/thesisviz/go-api/pkg/colorscheme"
 )
 
 type TikZAgent struct {
@@ -20,7 +19,7 @@ func NewTikZAgent(llm *llm.GeminiClient) *TikZAgent {
 func (a *TikZAgent) Format() string { return "tikz" }
 
 func (a *TikZAgent) Generate(ctx context.Context, userPrompt string, opts AgentOpts) (string, error) {
-	scheme := colorscheme.Get(opts.ColorScheme)
+	scheme := opts.ResolveScheme()
 	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
 	sysPrompt := prompt.TikZ(opts.Language, scheme.TikZPrompt, identity)
 
@@ -32,7 +31,7 @@ func (a *TikZAgent) Generate(ctx context.Context, userPrompt string, opts AgentO
 }
 
 func (a *TikZAgent) Refine(ctx context.Context, code, modification string, opts AgentOpts) (string, error) {
-	scheme := colorscheme.Get(opts.ColorScheme)
+	scheme := opts.ResolveScheme()
 	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
 	sysPrompt := prompt.TikZ(opts.Language, scheme.TikZPrompt, identity)
 
@@ -46,7 +45,7 @@ func (a *TikZAgent) Refine(ctx context.Context, code, modification string, opts 
 }
 
 func (a *TikZAgent) RefineWithImage(ctx context.Context, code, modification string, img []byte, opts AgentOpts) (string, error) {
-	scheme := colorscheme.Get(opts.ColorScheme)
+	scheme := opts.ResolveScheme()
 	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
 	sysPrompt := prompt.TikZ(opts.Language, scheme.TikZPrompt, identity)
 

@@ -19,13 +19,14 @@ func NewRenderHandler(svc *service.RenderService) *RenderHandler {
 }
 
 type renderRequest struct {
-	Code         string `json:"code" binding:"required"`
-	Format       string `json:"format" binding:"required"`
-	Language     string `json:"language,omitempty"`
-	ColorScheme  string `json:"color_scheme,omitempty"`
-	GenerationID string `json:"generation_id,omitempty"`
-	DPI          int    `json:"dpi,omitempty"`
-	Timeout      int    `json:"timeout,omitempty"`
+	Code         string                   `json:"code" binding:"required"`
+	Format       string                   `json:"format" binding:"required"`
+	Language     string                   `json:"language,omitempty"`
+	ColorScheme  string                   `json:"color_scheme,omitempty"`
+	CustomColors *colorscheme.CustomColors `json:"custom_colors,omitempty"`
+	GenerationID string                   `json:"generation_id,omitempty"`
+	DPI          int                      `json:"dpi,omitempty"`
+	Timeout      int                      `json:"timeout,omitempty"`
 }
 
 func (h *RenderHandler) Render(c *gin.Context) {
@@ -40,6 +41,7 @@ func (h *RenderHandler) Render(c *gin.Context) {
 		Format:       req.Format,
 		Language:     req.Language,
 		ColorScheme:  req.ColorScheme,
+		CustomColors: req.CustomColors,
 		GenerationID: req.GenerationID,
 		DPI:          req.DPI,
 		Timeout:      req.Timeout,
@@ -60,9 +62,10 @@ func (h *RenderHandler) Render(c *gin.Context) {
 }
 
 type exportTexRequest struct {
-	Code        string `json:"code" binding:"required"`
-	Language    string `json:"language,omitempty"`
-	ColorScheme string `json:"color_scheme,omitempty"`
+	Code         string                   `json:"code" binding:"required"`
+	Language     string                   `json:"language,omitempty"`
+	ColorScheme  string                   `json:"color_scheme,omitempty"`
+	CustomColors *colorscheme.CustomColors `json:"custom_colors,omitempty"`
 }
 
 // ExportTeX returns a complete .tex document ready for Overleaf.
@@ -73,7 +76,12 @@ func (h *RenderHandler) ExportTeX(c *gin.Context) {
 		return
 	}
 
-	colors := colorscheme.AllTikZColors(req.ColorScheme)
+	var colors string
+	if req.CustomColors != nil {
+		colors = colorscheme.AllTikZColorsCustom(*req.CustomColors)
+	} else {
+		colors = colorscheme.AllTikZColors(req.ColorScheme)
+	}
 	tex := renderer.BuildFullTeX(req.Code, colors, req.Language)
 
 	c.JSON(http.StatusOK, gin.H{"tex": tex})
