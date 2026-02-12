@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -17,7 +18,8 @@ import (
 
 const (
 	maxCompileRetries = 3
-	maxReviewRounds   = 3
+	maxRerolls        = 3
+	maxFixRounds      = 5
 )
 
 // ProgressMsg is the WebSocket message sent to clients during generation.
@@ -39,6 +41,8 @@ type ProgressData struct {
 	Explanation  string   `json:"explanation,omitempty"`
 	ReviewPassed bool     `json:"review_passed,omitempty"`
 	ReviewRounds int      `json:"review_rounds,omitempty"`
+	Critique     string   `json:"critique,omitempty"`
+	Score        float64  `json:"score,omitempty"`
 }
 
 type GenerateRequest struct {
@@ -162,6 +166,10 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 		return nil, err
 	}
 
+	pushFn(ProgressMsg{Type: "preview", Phase: "generating", Data: ProgressData{
+		Message: "代码生成完成", Progress: 20, Code: code,
+	}})
+
 	// === Phase 2: Compile + fix (for tikz/matplotlib, not mermaid) ===
 	var imageBytes []byte
 	var imageURL, imageKey string
@@ -213,89 +221,282 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 			imageKey = renderResp.ImageKey
 			// Download image bytes for review
 			imageBytes, _ = s.storage.Download(ctx, imageKey)
+
+			pushFn(ProgressMsg{Type: "preview", Phase: "compiling", Data: ProgressData{
+				Message: "编译成功", Progress: 45, Code: code, ImageURL: imageURL,
+			}})
 			break
 		}
 	}
 
-	// === Phase 3: Visual review + fix (only if we have an image) ===
+	// === Phase 3: Visual review → reroll → fix (only if we have an image) ===
 	reviewPassed := false
 	reviewRounds := 0
+	latestCritique := ""
+	var latestIssues []string
+	var latestScore float64
 
 	if len(imageBytes) > 0 {
-		for round := 1; round <= maxReviewRounds; round++ {
-			reviewRounds = round
-			pushFn(ProgressMsg{Type: "status", Phase: "reviewing", Data: ProgressData{
-				Message:  fmt.Sprintf("Visual review round %d...", round),
-				Progress: 50 + round*10,
-				Round:    round,
-				ImageURL: imageURL,
+		// --- Best version tracking (across initial + rerolls) ---
+		bestCode := code
+		bestImageURL := imageURL
+		bestImageKey := imageKey
+		bestImageBytes := imageBytes
+		bestScore := float64(0)
+		bestIssues := []string{}
+		bestCritique := ""
+
+		// Helper: update "latest" state from a review output.
+		applyReview := func(rev *reviewOutput) {
+			latestScore = rev.Score
+			latestIssues = rev.Issues
+			latestCritique = rev.Critique
+		}
+
+		// Helper: check if a review result means "passed".
+		isPassed := func(rev *reviewOutput) bool {
+			if rev.Passed || rev.Score >= 9 {
+				return true
+			}
+			if !rev.Passed && len(rev.Issues) == 0 {
+				return true
+			}
+			return false
+		}
+
+		// Helper: update best version if this score is higher.
+		updateBest := func(c string, url, key string, img []byte, rev *reviewOutput) {
+			if rev.Score > bestScore {
+				bestCode = c
+				bestImageURL = url
+				bestImageKey = key
+				bestImageBytes = img
+				bestScore = rev.Score
+				bestIssues = rev.Issues
+				bestCritique = rev.Critique
+			}
+		}
+
+		// --- 3a. Initial review ---
+		pushFn(ProgressMsg{Type: "status", Phase: "reviewing", Data: ProgressData{
+			Message: "视觉审查中...", Progress: 50, ImageURL: imageURL,
+		}})
+		reviewRounds++
+
+		rev, revErr := s.doReview(ctx, imageBytes, req.Prompt, req.Language, req.Model)
+		if revErr != nil {
+			s.logger.Warn("initial review failed", zap.Error(revErr))
+			latestCritique = fmt.Sprintf("审查调用失败: %s", revErr.Error())
+			// score stays 0 → will enter reroll
+		} else {
+			s.logger.Info("initial review", zap.Float64("score", rev.Score), zap.Bool("passed", rev.Passed))
+			applyReview(rev)
+			updateBest(code, imageURL, imageKey, imageBytes, rev)
+
+			if isPassed(rev) {
+				reviewPassed = true
+				pushFn(ProgressMsg{Type: "preview", Phase: "reviewing", Data: ProgressData{
+					Message: fmt.Sprintf("审查通过 (%.0f/10)", rev.Score), ImageURL: imageURL,
+					Critique: rev.Critique, Issues: rev.Issues, Score: rev.Score,
+				}})
+			} else {
+				pushFn(ProgressMsg{Type: "preview", Phase: "reviewing", Data: ProgressData{
+					Message: fmt.Sprintf("初始审查 %.0f/10，进入重画阶段", rev.Score), ImageURL: imageURL,
+					Critique: rev.Critique, Issues: rev.Issues, Score: rev.Score,
+				}})
+			}
+		}
+
+		// --- 3b. Reroll loop (up to maxRerolls, independent of fix count) ---
+		if !reviewPassed {
+			for reroll := 1; reroll <= maxRerolls; reroll++ {
+				negativeHint := fmt.Sprintf(
+					"\n\nIMPORTANT: A previous attempt scored %.0f/10 due to: %s. "+
+						"You MUST avoid these problems. Use a completely different layout strategy.",
+					latestScore, strings.Join(latestIssues, "; "),
+				)
+
+				pushFn(ProgressMsg{Type: "status", Phase: "rerolling", Data: ProgressData{
+					Message:  fmt.Sprintf("重新生成 (%d/%d)...", reroll, maxRerolls),
+					Progress: 50 + reroll*5,
+					Round:    reroll,
+					Score:    latestScore,
+				}})
+
+				s.logger.Info("triggering reroll",
+					zap.Int("reroll", reroll),
+					zap.Float64("prev_score", latestScore),
+				)
+
+				newCode, genErr := ag.Generate(ctx, req.Prompt+negativeHint, opts)
+				if genErr != nil {
+					s.logger.Warn("reroll generation failed", zap.Int("reroll", reroll), zap.Error(genErr))
+					pushFn(ProgressMsg{Type: "preview", Phase: "rerolling", Data: ProgressData{
+						Message: fmt.Sprintf("第 %d 次重画生成失败: %s", reroll, genErr.Error()),
+						Round:   reroll,
+					}})
+					continue
+				}
+
+				pushFn(ProgressMsg{Type: "preview", Phase: "rerolling", Data: ProgressData{
+					Message: fmt.Sprintf("第 %d 次重画生成完成，编译中...", reroll), Progress: 52 + reroll*5,
+					Round: reroll, Code: newCode,
+				}})
+
+				rURL, rKey, rBytes, renderErr := s.renderAndGetBytes(ctx, newCode, req.Format, req.Language, req.ColorScheme)
+				if renderErr != nil {
+					s.logger.Warn("reroll render failed", zap.Int("reroll", reroll), zap.Error(renderErr))
+					pushFn(ProgressMsg{Type: "preview", Phase: "rerolling", Data: ProgressData{
+						Message: fmt.Sprintf("第 %d 次重画编译失败: %s", reroll, renderErr.Error()),
+						Round:   reroll,
+					}})
+					continue
+				}
+
+				// Review the rerolled version
+				reviewRounds++
+				rev, revErr := s.doReview(ctx, rBytes, req.Prompt, req.Language, req.Model)
+				if revErr != nil {
+					s.logger.Warn("reroll review failed", zap.Int("reroll", reroll), zap.Error(revErr))
+					pushFn(ProgressMsg{Type: "preview", Phase: "rerolling", Data: ProgressData{
+						Message:  fmt.Sprintf("第 %d 次重画审查失败: %s", reroll, revErr.Error()),
+						Round:    reroll,
+						ImageURL: rURL,
+					}})
+					continue
+				}
+
+				applyReview(rev)
+				updateBest(newCode, rURL, rKey, rBytes, rev)
+
+				s.logger.Info("reroll review result",
+					zap.Int("reroll", reroll),
+					zap.Float64("score", rev.Score),
+					zap.Bool("passed", rev.Passed),
+				)
+
+				if isPassed(rev) {
+					reviewPassed = true
+					code = newCode
+					imageURL = rURL
+					imageKey = rKey
+					imageBytes = rBytes
+					pushFn(ProgressMsg{Type: "preview", Phase: "rerolling", Data: ProgressData{
+						Message:  fmt.Sprintf("第 %d 次重画通过 (%.0f/10)", reroll, rev.Score),
+						Round:    reroll,
+						ImageURL: rURL, Code: newCode,
+						Critique: rev.Critique, Issues: rev.Issues, Score: rev.Score,
+					}})
+					break
+				}
+
+				pushFn(ProgressMsg{Type: "preview", Phase: "rerolling", Data: ProgressData{
+					Message:  fmt.Sprintf("第 %d 次重画 %.0f/10，继续...", reroll, rev.Score),
+					Round:    reroll,
+					ImageURL: rURL, Code: newCode,
+					Critique: rev.Critique, Issues: rev.Issues, Score: rev.Score,
+				}})
+			}
+		}
+
+		// --- 3c. Switch to best version for fix phase ---
+		if !reviewPassed {
+			code = bestCode
+			imageURL = bestImageURL
+			imageKey = bestImageKey
+			imageBytes = bestImageBytes
+			latestScore = bestScore
+			latestIssues = bestIssues
+			latestCritique = bestCritique
+
+			s.logger.Info("using best version for fix phase",
+				zap.Float64("best_score", bestScore),
+			)
+
+			pushFn(ProgressMsg{Type: "status", Phase: "fixing", Data: ProgressData{
+				Message:  fmt.Sprintf("选择最佳版本 (%.0f/10) 进行修复润色...", bestScore),
+				Progress: 70,
+				Score:    bestScore, ImageURL: imageURL, Code: code,
+				Critique: bestCritique, Issues: bestIssues,
 			}})
 
-			reviewSys := prompt.ReviewSystem(req.Language)
-			reviewUser := "Review the attached image for layout issues and content completeness."
-			if req.Prompt != "" {
-				reviewUser += "\n\nOriginal drawing prompt: " + req.Prompt
-			}
+			// --- Fix loop (up to maxFixRounds) ---
+			for fix := 1; fix <= maxFixRounds; fix++ {
+				pushFn(ProgressMsg{Type: "preview", Phase: "fixing", Data: ProgressData{
+					Message:  fmt.Sprintf("第 %d/%d 轮修复 (%.0f/10)...", fix, maxFixRounds, latestScore),
+					Progress: 70 + fix*3,
+					Round:    fix,
+					Issues:   latestIssues, ImageURL: imageURL, Code: code,
+					Critique: latestCritique, Score: latestScore,
+				}})
 
-			reviewRaw, reviewErr := s.llm.ReviewImage(ctx, reviewSys, reviewUser, imageBytes, req.Model)
-			if reviewErr != nil {
-				s.logger.Warn("review failed", zap.Error(reviewErr))
-				reviewPassed = true // Skip review on error
-				break
-			}
+				fixPrompt := prompt.ReviewFix(latestIssues, latestScore, req.Language, req.Prompt)
+				newCode, fixErr := ag.RefineWithImage(ctx, code, fixPrompt, imageBytes, opts)
+				if fixErr != nil {
+					s.logger.Warn("fix failed", zap.Int("fix", fix), zap.Error(fixErr))
+					pushFn(ProgressMsg{Type: "preview", Phase: "fixing", Data: ProgressData{
+						Message:  fmt.Sprintf("第 %d 轮修复失败: %s", fix, fixErr.Error()),
+						Round:    fix,
+						Critique: fmt.Sprintf("修复代码生成失败: %s", fixErr.Error()),
+					}})
+					continue
+				}
+				code = newCode
 
-			reviewJSON, parseErr := agent.ParseJSON(reviewRaw)
-			if parseErr != nil {
-				s.logger.Warn("review parse failed", zap.Error(parseErr))
-				reviewPassed = true
-				break
-			}
+				// Re-render
+				fURL, fKey, fBytes, renderErr := s.renderAndGetBytes(ctx, code, req.Format, req.Language, req.ColorScheme)
+				if renderErr != nil {
+					s.logger.Warn("fix render failed", zap.Int("fix", fix), zap.Error(renderErr))
+					pushFn(ProgressMsg{Type: "preview", Phase: "fixing", Data: ProgressData{
+						Message:  fmt.Sprintf("第 %d 轮修复后编译失败: %s", fix, renderErr.Error()),
+						Round:    fix,
+						Critique: fmt.Sprintf("修复后渲染失败: %s", renderErr.Error()),
+					}})
+					continue
+				}
+				imageURL = fURL
+				imageKey = fKey
+				imageBytes = fBytes
 
-			var reviewResult struct {
-				Passed bool     `json:"passed"`
-				Issues []string `json:"issues"`
-			}
-			if err := json.Unmarshal([]byte(reviewJSON), &reviewResult); err != nil {
-				s.logger.Warn("review unmarshal failed", zap.Error(err))
-				reviewPassed = true
-				break
-			}
+				// Re-review
+				reviewRounds++
+				rev, revErr := s.doReview(ctx, imageBytes, req.Prompt, req.Language, req.Model)
+				if revErr != nil {
+					s.logger.Warn("fix review failed", zap.Int("fix", fix), zap.Error(revErr))
+					pushFn(ProgressMsg{Type: "preview", Phase: "fixing", Data: ProgressData{
+						Message:  fmt.Sprintf("第 %d 轮修复后审查失败: %s", fix, revErr.Error()),
+						Round:    fix,
+						ImageURL: imageURL, Code: code,
+					}})
+					continue
+				}
 
-			if reviewResult.Passed || len(reviewResult.Issues) == 0 {
-				reviewPassed = true
-				break
-			}
+				applyReview(rev)
 
-			// Not passed — try to fix
-			pushFn(ProgressMsg{Type: "preview", Phase: "fixing", Data: ProgressData{
-				Message:  fmt.Sprintf("Issues found in round %d, fixing...", round),
-				Round:    round,
-				Issues:   reviewResult.Issues,
-				ImageURL: imageURL,
-			}})
+				s.logger.Info("fix review result",
+					zap.Int("fix", fix),
+					zap.Float64("score", rev.Score),
+					zap.Bool("passed", rev.Passed),
+				)
 
-			fixPrompt := prompt.ReviewFix(reviewResult.Issues, req.Language, req.Prompt)
-			newCode, fixErr := ag.RefineWithImage(ctx, code, fixPrompt, imageBytes, opts)
-			if fixErr != nil {
-				s.logger.Warn("review fix failed", zap.Error(fixErr))
-				break
-			}
-			code = newCode
+				if isPassed(rev) {
+					reviewPassed = true
+					pushFn(ProgressMsg{Type: "preview", Phase: "reviewing", Data: ProgressData{
+						Message:  fmt.Sprintf("修复后审查通过 (%.0f/10)", rev.Score),
+						Round:    fix,
+						ImageURL: imageURL, Code: code,
+						Critique: rev.Critique, Issues: rev.Issues, Score: rev.Score,
+					}})
+					break
+				}
 
-			// Re-render after fix
-			renderResp, renderErr := s.renderSvc.RenderCode(ctx, RenderCodeRequest{
-				Code:        code,
-				Format:      req.Format,
-				Language:    req.Language,
-				ColorScheme: req.ColorScheme,
-			})
-			if renderErr != nil || renderResp.Status == "error" {
-				s.logger.Warn("re-render after fix failed")
-				break
+				pushFn(ProgressMsg{Type: "preview", Phase: "reviewing", Data: ProgressData{
+					Message:  fmt.Sprintf("第 %d 轮修复后 %.0f/10，继续...", fix, rev.Score),
+					Round:    fix,
+					ImageURL: imageURL, Code: code,
+					Critique: rev.Critique, Issues: rev.Issues, Score: rev.Score,
+				}})
 			}
-			imageURL = renderResp.ImageURL
-			imageKey = renderResp.ImageKey
-			imageBytes, _ = s.storage.Download(ctx, imageKey)
 		}
 	} else if req.Format == "mermaid" {
 		// Mermaid is rendered client-side, skip review
@@ -350,6 +551,9 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 		ImageURL:     imageURL,
 		ReviewPassed: reviewPassed,
 		ReviewRounds: reviewRounds,
+		Critique:     latestCritique,
+		Issues:       latestIssues,
+		Score:        latestScore,
 	}})
 
 	return result, nil
@@ -405,6 +609,59 @@ func (s *AgentService) Refine(ctx context.Context, req RefineRequest, pushFn fun
 	}
 
 	return result, nil
+}
+
+// reviewOutput holds parsed visual review results.
+type reviewOutput struct {
+	Passed   bool
+	Score    float64
+	Issues   []string
+	Critique string
+}
+
+// doReview performs a single visual review call and returns parsed results.
+func (s *AgentService) doReview(ctx context.Context, imageBytes []byte, drawingPrompt, language, mdl string) (*reviewOutput, error) {
+	reviewSys := prompt.ReviewSystem(language)
+	reviewUser := "Review the attached image for layout issues and content completeness."
+	if drawingPrompt != "" {
+		reviewUser += "\n\nOriginal drawing prompt: " + drawingPrompt
+	}
+
+	reviewRaw, err := s.llm.ReviewImage(ctx, reviewSys, reviewUser, imageBytes, mdl)
+	if err != nil {
+		return nil, fmt.Errorf("review call: %w", err)
+	}
+
+	s.logger.Info("review raw response", zap.String("raw", reviewRaw))
+
+	reviewJSON, err := agent.ParseJSON(reviewRaw)
+	if err != nil {
+		return nil, fmt.Errorf("review parse: %w", err)
+	}
+
+	var result struct {
+		Passed   bool     `json:"passed"`
+		Score    float64  `json:"score"`
+		Issues   []string `json:"issues"`
+		Critique string   `json:"critique"`
+	}
+	jsonStr := strings.TrimSpace(reviewJSON)
+	if len(jsonStr) > 0 && jsonStr[0] == '[' {
+		var arr []json.RawMessage
+		if err := json.Unmarshal([]byte(jsonStr), &arr); err == nil && len(arr) > 0 {
+			jsonStr = string(arr[0])
+		}
+	}
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, fmt.Errorf("review unmarshal: %w", err)
+	}
+
+	return &reviewOutput{
+		Passed:   result.Passed,
+		Score:    result.Score,
+		Issues:   result.Issues,
+		Critique: result.Critique,
+	}, nil
 }
 
 func (s *AgentService) markFailed(gen *model.Generation) {

@@ -5,6 +5,7 @@ export interface WSMessage {
     | "compiling"
     | "reviewing"
     | "fixing"
+    | "rerolling"
     | "explaining"
     | "done";
   data: {
@@ -20,6 +21,8 @@ export interface WSMessage {
     explanation?: string;
     review_passed?: boolean;
     review_rounds?: number;
+    critique?: string;
+    score?: number;
   };
 }
 

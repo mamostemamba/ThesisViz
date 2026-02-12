@@ -2,7 +2,12 @@ package llm
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"net"
+	"strings"
+	"time"
 
 	"google.golang.org/genai"
 )
@@ -33,6 +38,54 @@ func (c *GeminiClient) resolveModel(override string) string {
 	return c.model
 }
 
+const maxRetries = 3
+
+// isTransient returns true for errors that are worth retrying (network hiccups).
+func isTransient(err error) bool {
+	if err == nil {
+		return false
+	}
+	// unexpected EOF, connection reset, timeout
+	if err == io.ErrUnexpectedEOF {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+	msg := err.Error()
+	for _, substr := range []string{"unexpected EOF", "connection reset", "broken pipe", "UNAVAILABLE", "503", "429"} {
+		if strings.Contains(msg, substr) {
+			return true
+		}
+	}
+	return false
+}
+
+// generateWithRetry wraps GenerateContent with retries for transient errors.
+func (c *GeminiClient) generateWithRetry(ctx context.Context, model string, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			delay := time.Duration(attempt) * 2 * time.Second
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+		resp, err := c.client.Models.GenerateContent(ctx, model, contents, config)
+		if err == nil {
+			return resp, nil
+		}
+		lastErr = err
+		if !isTransient(err) {
+			return nil, err
+		}
+	}
+	return nil, lastErr
+}
+
 // Generate calls the model with a system prompt and user message.
 func (c *GeminiClient) Generate(ctx context.Context, systemPrompt, userMsg string, temp float32, modelOverrides ...string) (string, error) {
 	var override string
@@ -47,7 +100,7 @@ func (c *GeminiClient) Generate(ctx context.Context, systemPrompt, userMsg strin
 		},
 	}
 
-	resp, err := c.client.Models.GenerateContent(ctx, c.resolveModel(override), []*genai.Content{
+	resp, err := c.generateWithRetry(ctx, c.resolveModel(override), []*genai.Content{
 		{
 			Role:  "user",
 			Parts: []*genai.Part{genai.NewPartFromText(userMsg)},
@@ -75,7 +128,7 @@ func (c *GeminiClient) GenerateWithImage(ctx context.Context, systemPrompt, user
 		},
 	}
 
-	resp, err := c.client.Models.GenerateContent(ctx, c.resolveModel(override), []*genai.Content{
+	resp, err := c.generateWithRetry(ctx, c.resolveModel(override), []*genai.Content{
 		{
 			Role: "user",
 			Parts: []*genai.Part{
