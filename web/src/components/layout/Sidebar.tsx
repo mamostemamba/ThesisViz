@@ -18,6 +18,8 @@ export function Sidebar() {
   const setLanguage = useSettingsStore((s) => s.setLanguage);
   const colorScheme = useSettingsStore((s) => s.colorScheme);
   const setColorScheme = useSettingsStore((s) => s.setColorScheme);
+  const model = useSettingsStore((s) => s.model);
+  const setModel = useSettingsStore((s) => s.setModel);
   const isRendering = useGenerateStore((s) => s.isRendering);
 
   return (
@@ -69,6 +71,20 @@ export function Sidebar() {
               <SelectItem value="academic_blue">Academic Blue</SelectItem>
               <SelectItem value="nature">Nature</SelectItem>
               <SelectItem value="ieee">IEEE</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">AI Model</label>
+          <Select value={model} onValueChange={setModel}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
+              <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
+              <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
             </SelectContent>
           </Select>
         </div>

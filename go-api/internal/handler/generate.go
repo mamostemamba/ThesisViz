@@ -27,6 +27,7 @@ type analyzeRequest struct {
 	Language       string `json:"language"`
 	ThesisTitle    string `json:"thesis_title"`
 	ThesisAbstract string `json:"thesis_abstract"`
+	Model          string `json:"model"`
 }
 
 // Analyze handles POST /api/v1/generate/analyze
@@ -46,6 +47,7 @@ func (h *GenerateHandler) Analyze(c *gin.Context) {
 		Language:       req.Language,
 		ThesisTitle:    req.ThesisTitle,
 		ThesisAbstract: req.ThesisAbstract,
+		Model:          req.Model,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -63,6 +65,7 @@ type createRequest struct {
 	ColorScheme    string `json:"color_scheme"`
 	ThesisTitle    string `json:"thesis_title"`
 	ThesisAbstract string `json:"thesis_abstract"`
+	Model          string `json:"model"`
 }
 
 // Create handles POST /api/v1/generate/create
@@ -96,6 +99,7 @@ func (h *GenerateHandler) Create(c *gin.Context) {
 			ColorScheme:    req.ColorScheme,
 			ThesisTitle:    req.ThesisTitle,
 			ThesisAbstract: req.ThesisAbstract,
+			Model:          req.Model,
 		}, pushFn)
 
 		if err != nil {
@@ -115,6 +119,7 @@ type refineRequestBody struct {
 	Modification string `json:"modification" binding:"required"`
 	Language     string `json:"language"`
 	ColorScheme  string `json:"color_scheme"`
+	Model        string `json:"model"`
 }
 
 // Refine handles POST /api/v1/generate/refine
@@ -144,6 +149,7 @@ func (h *GenerateHandler) Refine(c *gin.Context) {
 			Modification: req.Modification,
 			Language:     req.Language,
 			ColorScheme:  req.ColorScheme,
+			Model:        req.Model,
 		}, pushFn)
 
 		if err != nil {
@@ -176,6 +182,7 @@ func (h *GenerateHandler) Get(c *gin.Context) {
 	resp := gin.H{
 		"id":            gen.ID,
 		"project_id":    gen.ProjectID,
+		"parent_id":     gen.ParentID,
 		"format":        gen.Format,
 		"prompt":        gen.Prompt,
 		"status":        gen.Status,

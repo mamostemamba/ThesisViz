@@ -24,7 +24,7 @@ func (a *MermaidAgent) Generate(ctx context.Context, userPrompt string, opts Age
 	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
 	sysPrompt := prompt.Mermaid(opts.Language, scheme.TikZPrompt, identity)
 
-	raw, err := a.llm.Generate(ctx, sysPrompt, userPrompt, 0.4)
+	raw, err := a.llm.Generate(ctx, sysPrompt, userPrompt, 0.4, opts.Model)
 	if err != nil {
 		return "", fmt.Errorf("mermaid generate: %w", err)
 	}
@@ -38,7 +38,7 @@ func (a *MermaidAgent) Refine(ctx context.Context, code, modification string, op
 
 	userMsg := fmt.Sprintf("Here is the current Mermaid code:\n\n%s\n\nPlease fix these issues:\n%s\n\nOutput ONLY the complete fixed Mermaid code.", code, modification)
 
-	raw, err := a.llm.Generate(ctx, sysPrompt, userMsg, 0.4)
+	raw, err := a.llm.Generate(ctx, sysPrompt, userMsg, 0.4, opts.Model)
 	if err != nil {
 		return "", fmt.Errorf("mermaid refine: %w", err)
 	}

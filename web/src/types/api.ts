@@ -73,6 +73,7 @@ export interface AnalyzeRequest {
   language?: string;
   thesis_title?: string;
   thesis_abstract?: string;
+  model?: string;
 }
 
 export interface Recommendation {
@@ -95,6 +96,7 @@ export interface GenerateCreateRequest {
   color_scheme?: string;
   thesis_title?: string;
   thesis_abstract?: string;
+  model?: string;
 }
 
 export interface GenerateCreateResponse {
@@ -106,6 +108,7 @@ export interface GenerateRefineRequest {
   modification: string;
   language?: string;
   color_scheme?: string;
+  model?: string;
 }
 
 export interface GenerateRefineResponse {

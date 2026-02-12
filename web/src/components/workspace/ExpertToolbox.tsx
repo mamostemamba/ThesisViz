@@ -11,9 +11,13 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useRender } from "@/lib/queries";
 import { exportTeX, generateCreate } from "@/lib/api";
 import { connectGeneration, type WSMessage } from "@/lib/ws";
-import { Play, Copy, Check, Sparkles, Loader2 } from "lucide-react";
+import { Play, Copy, Check, Sparkles, Loader2, Download, ExternalLink } from "lucide-react";
 
-export function ExpertToolbox() {
+interface ExpertToolboxProps {
+  projectId?: string;
+}
+
+export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
   const code = useGenerateStore((s) => s.code);
   const imageUrl = useGenerateStore((s) => s.imageUrl);
   const setCode = useGenerateStore((s) => s.setCode);
@@ -25,6 +29,7 @@ export function ExpertToolbox() {
   const format = useSettingsStore((s) => s.format);
   const language = useSettingsStore((s) => s.language);
   const colorScheme = useSettingsStore((s) => s.colorScheme);
+  const model = useSettingsStore((s) => s.model);
 
   const renderMutation = useRender();
   const [copied, setCopied] = useState(false);
@@ -50,6 +55,15 @@ export function ExpertToolbox() {
 
   const handleRender = useCallback(async () => {
     if (!code.trim()) return;
+
+    // Mermaid renders client-side — just trigger a re-render via state
+    if (format === "mermaid") {
+      hasRendered.current = true;
+      // Force ImagePreview to re-read code by toggling rendering state
+      setRenderError(null);
+      setImageUrl(null);
+      return;
+    }
 
     setIsRendering(true);
     setRenderError(null);
@@ -119,10 +133,12 @@ export function ExpertToolbox() {
 
     try {
       const res = await generateCreate({
+        project_id: projectId || undefined,
         format,
         prompt: aiPrompt,
         language,
         color_scheme: colorScheme,
+        model,
       });
 
       wsCleanupRef.current?.();
@@ -159,7 +175,7 @@ export function ExpertToolbox() {
       );
       setAiGenerating(false);
     }
-  }, [aiPrompt, format, language, colorScheme, setCode, setImageUrl]);
+  }, [aiPrompt, projectId, format, language, colorScheme, model, setCode, setImageUrl]);
 
   return (
     <div className="flex h-[calc(100vh-10rem)] flex-col gap-3">
@@ -209,7 +225,7 @@ export function ExpertToolbox() {
           <div className="min-h-0 flex-1">
             <CodeEditor />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               className="flex-1"
               onClick={handleRender}
@@ -232,16 +248,68 @@ export function ExpertToolbox() {
                 {copied ? "Copied!" : "Copy for Overleaf"}
               </Button>
             )}
+            {format === "mermaid" && code.trim() && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const svgEl = document.querySelector(".mermaid-preview svg");
+                    if (!svgEl) return;
+                    const { toPng } = await import("html-to-image");
+                    const dataUrl = await toPng(svgEl as unknown as HTMLElement, { backgroundColor: "#ffffff" });
+                    const link = document.createElement("a");
+                    link.download = "figure.png";
+                    link.href = dataUrl;
+                    link.click();
+                  }}
+                >
+                  <Download className="mr-1 h-4 w-4" />
+                  PNG
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const svgEl = document.querySelector(".mermaid-preview svg");
+                    if (!svgEl) return;
+                    const svgStr = new XMLSerializer().serializeToString(svgEl);
+                    const blob = new Blob([svgStr], { type: "image/svg+xml" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.download = "figure.svg";
+                    link.href = url;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  <Download className="mr-1 h-4 w-4" />
+                  SVG
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const state = JSON.stringify({ code, mermaid: { theme: "default" } });
+                    const encoded = btoa(unescape(encodeURIComponent(state)));
+                    window.open(`https://mermaid.live/edit#base64:${encoded}`, "_blank");
+                  }}
+                >
+                  <ExternalLink className="mr-1 h-4 w-4" />
+                  Mermaid Live
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
         {/* Right: Preview */}
         <div className="flex w-1/2 flex-col gap-2">
           <label className="text-sm font-medium">Preview</label>
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div className="mermaid-preview min-h-0 flex-1 overflow-auto">
             <ImagePreview />
           </div>
-          {imageUrl && (
+          {imageUrl && format !== "mermaid" && (
             <a
               href={imageUrl}
               target="_blank"

@@ -30,7 +30,7 @@ func NewRouterAgent(llm *llm.GeminiClient) *RouterAgent {
 func (a *RouterAgent) Analyze(ctx context.Context, text string, opts AgentOpts) ([]Recommendation, error) {
 	sysPrompt := prompt.Router(opts.Language, opts.ThesisTitle, opts.ThesisAbstract)
 
-	raw, err := a.llm.Generate(ctx, sysPrompt, text, 0.4)
+	raw, err := a.llm.Generate(ctx, sysPrompt, text, 0.4, opts.Model)
 	if err != nil {
 		return nil, fmt.Errorf("router analyze: %w", err)
 	}

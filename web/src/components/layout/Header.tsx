@@ -1,15 +1,28 @@
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 
-export function Header() {
+interface HeaderProps {
+  projectTitle?: string;
+}
+
+export function Header({ projectTitle }: HeaderProps) {
   return (
     <header className="border-b bg-background">
       <div className="container mx-auto flex h-14 items-center px-4">
         <Link href="/" className="text-lg font-semibold">
           ThesisViz
         </Link>
-        <nav className="ml-8 flex gap-4 text-sm text-muted-foreground">
-          <Link href="/project" className="hover:text-foreground">
-            Workspace
+        {projectTitle && (
+          <div className="ml-2 flex items-center text-sm text-muted-foreground">
+            <ChevronRight className="h-4 w-4" />
+            <span className="ml-1 font-medium text-foreground">
+              {projectTitle}
+            </span>
+          </div>
+        )}
+        <nav className="ml-auto flex gap-4 text-sm text-muted-foreground">
+          <Link href="/" className="hover:text-foreground">
+            Projects
           </Link>
         </nav>
       </div>

@@ -1,12 +1,17 @@
 "use client";
 
 import { useGenerateStore } from "@/stores/useGenerateStore";
+import { useSettingsStore } from "@/stores/useSettingsStore";
+import { MermaidRenderer } from "./MermaidRenderer";
 import { ImageIcon } from "lucide-react";
 
 export function ImagePreview() {
   const imageUrl = useGenerateStore((s) => s.imageUrl);
+  const code = useGenerateStore((s) => s.code);
   const isRendering = useGenerateStore((s) => s.isRendering);
   const renderError = useGenerateStore((s) => s.renderError);
+  const format = useSettingsStore((s) => s.format);
+  const colorScheme = useSettingsStore((s) => s.colorScheme);
 
   if (isRendering) {
     return (
@@ -30,6 +35,11 @@ export function ImagePreview() {
         </div>
       </div>
     );
+  }
+
+  // Mermaid: render client-side
+  if (format === "mermaid" && code.trim()) {
+    return <MermaidRenderer code={code} colorScheme={colorScheme} />;
   }
 
   if (imageUrl) {

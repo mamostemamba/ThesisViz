@@ -24,7 +24,7 @@ func (a *TikZAgent) Generate(ctx context.Context, userPrompt string, opts AgentO
 	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
 	sysPrompt := prompt.TikZ(opts.Language, scheme.TikZPrompt, identity)
 
-	raw, err := a.llm.Generate(ctx, sysPrompt, userPrompt, 0.4)
+	raw, err := a.llm.Generate(ctx, sysPrompt, userPrompt, 0.4, opts.Model)
 	if err != nil {
 		return "", fmt.Errorf("tikz generate: %w", err)
 	}
@@ -38,7 +38,7 @@ func (a *TikZAgent) Refine(ctx context.Context, code, modification string, opts 
 
 	userMsg := fmt.Sprintf("Here is the current TikZ code:\n\n%s\n\nPlease fix these issues:\n%s\n\nOutput ONLY the complete fixed TikZ code.", code, modification)
 
-	raw, err := a.llm.Generate(ctx, sysPrompt, userMsg, 0.4)
+	raw, err := a.llm.Generate(ctx, sysPrompt, userMsg, 0.4, opts.Model)
 	if err != nil {
 		return "", fmt.Errorf("tikz refine: %w", err)
 	}
@@ -52,7 +52,7 @@ func (a *TikZAgent) RefineWithImage(ctx context.Context, code, modification stri
 
 	userMsg := fmt.Sprintf("Here is the current TikZ code:\n\n%s\n\nThe rendered result is shown in the attached image. Please fix these issues:\n%s\n\nOutput ONLY the complete fixed TikZ code.", code, modification)
 
-	raw, err := a.llm.GenerateWithImage(ctx, sysPrompt, userMsg, img, 0.4)
+	raw, err := a.llm.GenerateWithImage(ctx, sysPrompt, userMsg, img, 0.4, opts.Model)
 	if err != nil {
 		return "", fmt.Errorf("tikz refine with image: %w", err)
 	}

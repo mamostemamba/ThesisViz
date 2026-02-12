@@ -25,8 +25,21 @@ func NewGeminiClient(ctx context.Context, apiKey, model string) (*GeminiClient, 
 	return &GeminiClient{client: client, model: model}, nil
 }
 
+// resolveModel returns the override model if non-empty, otherwise the default.
+func (c *GeminiClient) resolveModel(override string) string {
+	if override != "" {
+		return override
+	}
+	return c.model
+}
+
 // Generate calls the model with a system prompt and user message.
-func (c *GeminiClient) Generate(ctx context.Context, systemPrompt, userMsg string, temp float32) (string, error) {
+func (c *GeminiClient) Generate(ctx context.Context, systemPrompt, userMsg string, temp float32, modelOverrides ...string) (string, error) {
+	var override string
+	if len(modelOverrides) > 0 {
+		override = modelOverrides[0]
+	}
+
 	config := &genai.GenerateContentConfig{
 		Temperature: genai.Ptr(temp),
 		SystemInstruction: &genai.Content{
@@ -34,7 +47,7 @@ func (c *GeminiClient) Generate(ctx context.Context, systemPrompt, userMsg strin
 		},
 	}
 
-	resp, err := c.client.Models.GenerateContent(ctx, c.model, []*genai.Content{
+	resp, err := c.client.Models.GenerateContent(ctx, c.resolveModel(override), []*genai.Content{
 		{
 			Role:  "user",
 			Parts: []*genai.Part{genai.NewPartFromText(userMsg)},
@@ -49,7 +62,12 @@ func (c *GeminiClient) Generate(ctx context.Context, systemPrompt, userMsg strin
 }
 
 // GenerateWithImage calls the model with a system prompt, user message, and image.
-func (c *GeminiClient) GenerateWithImage(ctx context.Context, systemPrompt, userMsg string, img []byte, temp float32) (string, error) {
+func (c *GeminiClient) GenerateWithImage(ctx context.Context, systemPrompt, userMsg string, img []byte, temp float32, modelOverrides ...string) (string, error) {
+	var override string
+	if len(modelOverrides) > 0 {
+		override = modelOverrides[0]
+	}
+
 	config := &genai.GenerateContentConfig{
 		Temperature: genai.Ptr(temp),
 		SystemInstruction: &genai.Content{
@@ -57,7 +75,7 @@ func (c *GeminiClient) GenerateWithImage(ctx context.Context, systemPrompt, user
 		},
 	}
 
-	resp, err := c.client.Models.GenerateContent(ctx, c.model, []*genai.Content{
+	resp, err := c.client.Models.GenerateContent(ctx, c.resolveModel(override), []*genai.Content{
 		{
 			Role: "user",
 			Parts: []*genai.Part{
@@ -75,6 +93,6 @@ func (c *GeminiClient) GenerateWithImage(ctx context.Context, systemPrompt, user
 }
 
 // ReviewImage calls the model with lower temperature for visual quality review.
-func (c *GeminiClient) ReviewImage(ctx context.Context, systemPrompt, userMsg string, img []byte) (string, error) {
-	return c.GenerateWithImage(ctx, systemPrompt, userMsg, img, 0.2)
+func (c *GeminiClient) ReviewImage(ctx context.Context, systemPrompt, userMsg string, img []byte, modelOverrides ...string) (string, error) {
+	return c.GenerateWithImage(ctx, systemPrompt, userMsg, img, 0.2, modelOverrides...)
 }

@@ -49,6 +49,7 @@ type GenerateRequest struct {
 	ColorScheme    string
 	ThesisTitle    string
 	ThesisAbstract string
+	Model          string
 }
 
 type RefineRequest struct {
@@ -56,6 +57,7 @@ type RefineRequest struct {
 	Modification string
 	Language     string
 	ColorScheme  string
+	Model        string
 }
 
 type AnalyzeRequest struct {
@@ -63,6 +65,7 @@ type AnalyzeRequest struct {
 	Language       string
 	ThesisTitle    string
 	ThesisAbstract string
+	Model          string
 }
 
 type GenerateResult struct {
@@ -111,6 +114,7 @@ func (s *AgentService) Analyze(ctx context.Context, req AnalyzeRequest) ([]agent
 		Language:       req.Language,
 		ThesisTitle:    req.ThesisTitle,
 		ThesisAbstract: req.ThesisAbstract,
+		Model:          req.Model,
 	}
 	return s.router.Analyze(ctx, req.Text, opts)
 }
@@ -127,6 +131,7 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 		ColorScheme:    req.ColorScheme,
 		ThesisTitle:    req.ThesisTitle,
 		ThesisAbstract: req.ThesisAbstract,
+		Model:          req.Model,
 	}
 
 	// Create generation record
@@ -232,7 +237,7 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 				reviewUser += "\n\nOriginal drawing prompt: " + req.Prompt
 			}
 
-			reviewRaw, reviewErr := s.llm.ReviewImage(ctx, reviewSys, reviewUser, imageBytes)
+			reviewRaw, reviewErr := s.llm.ReviewImage(ctx, reviewSys, reviewUser, imageBytes, req.Model)
 			if reviewErr != nil {
 				s.logger.Warn("review failed", zap.Error(reviewErr))
 				reviewPassed = true // Skip review on error
@@ -303,7 +308,7 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 	}})
 
 	explanationSys := prompt.Explanation(req.Format, req.Language)
-	explanation, _ := s.llm.Generate(ctx, explanationSys, code, 0.4)
+	explanation, _ := s.llm.Generate(ctx, explanationSys, code, 0.4, req.Model)
 
 	// === Phase 5: Save result ===
 	codePtr := &code
@@ -372,22 +377,34 @@ func (s *AgentService) Refine(ctx context.Context, req RefineRequest, pushFn fun
 		return nil, fmt.Errorf("unsupported format: %s", format)
 	}
 
-	opts := agent.AgentOpts{
-		Language:    req.Language,
-		ColorScheme: req.ColorScheme,
-	}
-
 	_ = ag
-	_ = opts
 
 	// Use the full generate pipeline with the refine as a new prompt
-	return s.Generate(ctx, GenerateRequest{
+	result, err := s.Generate(ctx, GenerateRequest{
 		ProjectID:   gen.ProjectID.String(),
 		Format:      format,
 		Prompt:      fmt.Sprintf("Modify this existing code:\n\n%s\n\nModification: %s", *gen.Code, req.Modification),
 		Language:    req.Language,
 		ColorScheme: req.ColorScheme,
+		Model:       req.Model,
 	}, pushFn)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set parent ID for chain tracking
+	if result != nil && result.GenerationID != "" {
+		childID, parseErr := uuid.Parse(result.GenerationID)
+		if parseErr == nil {
+			childGen, getErr := s.genSvc.GetByID(childID)
+			if getErr == nil {
+				childGen.ParentID = &gen.ID
+				_ = s.genSvc.Update(childGen)
+			}
+		}
+	}
+
+	return result, nil
 }
 
 func (s *AgentService) markFailed(gen *model.Generation) {

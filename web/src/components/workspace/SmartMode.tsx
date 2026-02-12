@@ -20,7 +20,11 @@ import { generateCreate } from "@/lib/api";
 import { Search, Sparkles, Loader2 } from "lucide-react";
 import type { Recommendation } from "@/types/api";
 
-export function SmartMode() {
+interface SmartModeProps {
+  projectId?: string;
+}
+
+export function SmartMode({ projectId }: SmartModeProps) {
   const [text, setText] = useState("");
   const [thesisTitle, setThesisTitle] = useState("");
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -29,6 +33,7 @@ export function SmartMode() {
   const language = useSettingsStore((s) => s.language);
   const format = useSettingsStore((s) => s.format);
   const colorScheme = useSettingsStore((s) => s.colorScheme);
+  const model = useSettingsStore((s) => s.model);
 
   const taskId = useGenerateStore((s) => s.taskId);
   const phase = useGenerateStore((s) => s.phase);
@@ -64,9 +69,10 @@ export function SmartMode() {
       text,
       language,
       thesis_title: thesisTitle || undefined,
+      model,
     });
     setRecommendations(res.recommendations || []);
-  }, [text, language, thesisTitle, analyzeMutation, resetGeneration]);
+  }, [text, language, thesisTitle, model, analyzeMutation, resetGeneration]);
 
   const startGeneration = useCallback(
     async (prompt: string, fmt?: string) => {
@@ -75,11 +81,13 @@ export function SmartMode() {
 
       try {
         const res = await generateCreate({
+          project_id: projectId || undefined,
           format: fmt || format,
           prompt,
           language,
           color_scheme: colorScheme,
           thesis_title: thesisTitle || undefined,
+          model,
         });
 
         setTaskId(res.task_id);
@@ -125,10 +133,12 @@ export function SmartMode() {
       }
     },
     [
+      projectId,
       format,
       language,
       colorScheme,
       thesisTitle,
+      model,
       resetGeneration,
       setTaskId,
       setPhase,

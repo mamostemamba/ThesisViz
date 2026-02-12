@@ -20,4 +20,5 @@ type AgentOpts struct {
 	ColorScheme    string
 	ThesisTitle    string
 	ThesisAbstract string
+	Model          string
 }
