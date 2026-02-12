@@ -12,10 +12,10 @@ interface SettingsState {
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
-  format: "matplotlib",
-  language: "en",
-  colorScheme: "academic_blue",
-  model: "gemini-2.5-flash",
+  format: "tikz",
+  language: "zh",
+  colorScheme: "drawio",
+  model: "gemini-3-pro-preview",
   setFormat: (format) => set({ format }),
   setLanguage: (language) => set({ language }),
   setColorScheme: (colorScheme) => set({ colorScheme }),

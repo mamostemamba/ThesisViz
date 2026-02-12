@@ -22,6 +22,82 @@ const texTemplate = `\documentclass[border=20pt]{standalone}
 %s
 \usetikzlibrary{arrows.meta,shapes.geometric,shapes.multipart,positioning,calc,fit,backgrounds,shadows,decorations.pathmorphing,decorations.pathreplacing,decorations.markings,patterns,matrix,chains,scopes}
 %s
+
+%% ---- Pre-defined modern styles (referenced in LLM system prompt) ----
+\tikzset{
+    %% Base box: rounded rectangle with light drop shadow (matches V1 academic style)
+    modern_box/.style={
+        rectangle,
+        rounded corners=3pt,
+        align=center,
+        minimum height=0.9cm,
+        minimum width=2.8cm,
+        thick,
+        font=\sffamily\small,
+        drop shadow={opacity=0.15},
+    },
+    %% Professional arrow with Stealth tip — for ALL connections
+    nice_arrow/.style={
+        ->,
+        >={Stealth[length=5pt, width=4pt]},
+        thick,
+        rounded corners=3pt,
+        draw=neutralLine,
+    },
+    %% Bidirectional arrow
+    nice_biarrow/.style={
+        <->,
+        >={Stealth[length=5pt, width=4pt]},
+        thick,
+        rounded corners=3pt,
+        draw=neutralLine,
+    },
+    %% Dashed container for grouping nodes (use with fit)
+    container_box/.style={
+        rectangle,
+        rounded corners=6pt,
+        draw=neutralLine,
+        dashed,
+        thick,
+        fill=neutralFill,
+        fill opacity=0.3,
+        inner sep=10pt,
+        font=\sffamily\small,
+    },
+    %% Layer row box: solid background container for a row of matrix nodes
+    layer_box/.style={
+        rectangle,
+        rounded corners=8pt,
+        draw=#1!80!black,
+        fill=#1!6,
+        thick,
+        inner sep=12pt,
+        font=\sffamily\small\bfseries,
+    },
+    %% Matrix default node style
+    matrix_node/.style={
+        modern_box,
+        text width=3.5cm,
+        minimum height=1.1cm,
+    },
+    %% Visible brace: extra-thick curly brace for grouping (survives image compression)
+    visible_brace/.style={
+        decorate,
+        decoration={brace, amplitude=10pt, raise=4pt},
+        very thick,
+        draw=black!90,
+    },
+    %% Visible brace (mirrored, opening to the left)
+    visible_brace_mirror/.style={
+        decorate,
+        decoration={brace, mirror, amplitude=10pt, raise=4pt},
+        very thick,
+        draw=black!90,
+    },
+    %% Force all decoration lines to be thick enough for visual review
+    every decoration/.style={very thick},
+}
+
 \begin{document}
 %s
 \end{document}

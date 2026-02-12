@@ -11,11 +11,21 @@ import {
   Download,
   ExternalLink,
   FileCode,
+  ZoomIn,
+  MessageSquareText,
+  AlertCircle,
 } from "lucide-react";
+import { ImageLightbox } from "./ImageLightbox";
 import { MermaidRenderer } from "./MermaidRenderer";
 import { DiffViewer } from "./DiffViewer";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { exportTeX } from "@/lib/api";
+
+export interface ImageSnapshot {
+  round: number;
+  imageUrl: string;
+  label: string;
+}
 
 interface ResultPanelProps {
   code: string;
@@ -24,9 +34,12 @@ interface ResultPanelProps {
   imageUrl: string;
   reviewPassed: boolean;
   reviewRounds: number;
+  reviewCritique?: string;
+  reviewIssues?: string[];
   onRefine: (modification: string) => void;
   isRefining: boolean;
   parentCode?: string;
+  imageSnapshots?: ImageSnapshot[];
 }
 
 export function ResultPanel({
@@ -39,11 +52,15 @@ export function ResultPanel({
   onRefine,
   isRefining,
   parentCode,
+  imageSnapshots,
+  reviewCritique,
+  reviewIssues,
 }: ResultPanelProps) {
   const colorScheme = useSettingsStore((s) => s.colorScheme);
   const language = useSettingsStore((s) => s.language);
   const [modification, setModification] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const mermaidContainerRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = useCallback(
@@ -144,22 +161,85 @@ export function ResultPanel({
               <MermaidRenderer code={code} colorScheme={colorScheme} />
             </div>
           ) : imageUrl ? (
-            <a
-              href={imageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block"
-            >
+            <div className="relative group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imageUrl}
                 alt="Generated figure"
                 className="max-h-[400px] w-full rounded border object-contain"
               />
-            </a>
+              <button
+                onClick={() => setLightboxSrc(imageUrl)}
+                className="absolute top-2 right-2 rounded-md bg-black/50 p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/70"
+                title="放大查看"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+            </div>
           ) : (
             <div className="flex h-[300px] items-center justify-center rounded border border-dashed text-sm text-muted-foreground">
               暂无图片
+            </div>
+          )}
+
+          {/* Version history: show all round images */}
+          {imageSnapshots && imageSnapshots.length > 1 && (
+            <details className="rounded border bg-muted/30">
+              <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground">
+                优化历程 ({imageSnapshots.length} 版)
+              </summary>
+              <div className="grid gap-2 p-2 sm:grid-cols-2 border-t">
+                {imageSnapshots.map((snap, i) => (
+                  <div key={snap.imageUrl} className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      {i + 1}. {snap.label}
+                      {i === imageSnapshots.length - 1 && (
+                        <span className="ml-1 text-green-600 font-medium">（最终版）</span>
+                      )}
+                    </p>
+                    <div className="relative group">
+                      <img
+                        src={snap.imageUrl}
+                        alt={snap.label}
+                        className="max-h-[200px] rounded border object-contain w-full"
+                      />
+                      <button
+                        onClick={() => setLightboxSrc(snap.imageUrl)}
+                        className="absolute top-1 right-1 rounded bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/70"
+                        title="放大查看"
+                      >
+                        <ZoomIn className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {/* Review issues */}
+          {reviewIssues && reviewIssues.length > 0 && (
+            <div className="rounded border border-yellow-200 bg-yellow-50 p-2.5 text-xs dark:border-yellow-800 dark:bg-yellow-950">
+              <div className="flex items-center gap-1 font-medium text-yellow-700 dark:text-yellow-300 mb-1">
+                <AlertCircle className="h-3 w-3" />
+                审查发现的问题（{reviewIssues.length} 项）
+              </div>
+              <ul className="list-disc list-inside space-y-0.5 text-yellow-600 dark:text-yellow-400">
+                {reviewIssues.map((issue, i) => (
+                  <li key={i}>{issue}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* AI Critique */}
+          {reviewCritique && (
+            <div className="rounded border border-blue-200 bg-blue-50 p-2.5 text-xs dark:border-blue-800 dark:bg-blue-950">
+              <div className="flex items-center gap-1 font-medium text-blue-700 dark:text-blue-300 mb-1">
+                <MessageSquareText className="h-3 w-3" />
+                AI 点评
+              </div>
+              <p className="text-blue-600 dark:text-blue-400">{reviewCritique}</p>
             </div>
           )}
 
@@ -270,6 +350,14 @@ export function ResultPanel({
           {isRefining ? "优化中..." : "优化"}
         </Button>
       </div>
+
+      {lightboxSrc && (
+        <ImageLightbox
+          src={lightboxSrc}
+          alt="放大查看"
+          onClose={() => setLightboxSrc(null)}
+        />
+      )}
     </div>
   );
 }

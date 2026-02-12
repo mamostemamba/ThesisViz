@@ -82,13 +82,13 @@ var schemes = map[string]Scheme{
 \definecolor{drawGreyFill}{HTML}{F5F5F5}
 \definecolor{drawGreyLine}{HTML}{666666}`,
 		TikZPrompt: `These colors are PRE-DEFINED in the preamble — do NOT redefine them, just USE them:
-  - Primary (blue): fill=primaryFill, draw=primaryLine
-  - Secondary (green): fill=secondaryFill, draw=secondaryLine
-  - Tertiary (orange): fill=tertiaryFill, draw=tertiaryLine
-  - Quaternary (purple): fill=quaternaryFill, draw=quaternaryLine
-  - Highlight (red): fill=highlightFill, draw=highlightLine
-  - Neutral (grey): fill=neutralFill, draw=neutralLine
-Example style: base_box/.style={rectangle, rounded corners=3pt, align=center, minimum height=0.9cm, minimum width=2.8cm, drop shadow={opacity=0.15}, thick}`,
+  - Primary (blue): fill=primaryFill, draw=primaryLine  (also: fill=drawBlueFill, draw=drawBlueLine)
+  - Secondary (green): fill=secondaryFill, draw=secondaryLine  (also: fill=drawGreenFill, draw=drawGreenLine)
+  - Tertiary (orange): fill=tertiaryFill, draw=tertiaryLine  (also: fill=drawOrangeFill, draw=drawOrangeLine)
+  - Quaternary (purple): fill=quaternaryFill, draw=quaternaryLine  (also: fill=drawPurpleFill, draw=drawPurpleLine)
+  - Highlight (red): fill=highlightFill, draw=highlightLine  (also: fill=drawRedFill, draw=drawRedLine)
+  - Neutral (grey): fill=neutralFill, draw=neutralLine  (also: fill=drawGreyFill, draw=drawGreyLine)
+You can use either the semantic names (primaryFill) or the drawio names (drawBlueFill) — both are defined.`,
 		MatplotlibColors:     "['#DAE8FC', '#D5E8D4', '#FFE6CC', '#E1D5E7', '#F8CECC', '#6C8EBF', '#82B366', '#D79B00', '#9673A6', '#B85450']",
 		MatplotlibEdgeColors: "['#6C8EBF', '#82B366', '#D79B00', '#9673A6', '#B85450', '#666666']",
 		MermaidTheme:         "default",

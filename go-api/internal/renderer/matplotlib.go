@@ -36,7 +36,7 @@ type matplotlibResponse struct {
 func (r *MatplotlibRenderer) Render(ctx context.Context, code string, opts RenderOpts) (*RenderResult, error) {
 	timeout := opts.Timeout
 	if timeout <= 0 {
-		timeout = 30
+		timeout = 60
 	}
 
 	reqBody := matplotlibRequest{

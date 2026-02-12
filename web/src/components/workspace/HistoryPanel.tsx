@@ -11,9 +11,10 @@ import type { Generation } from "@/types/api";
 
 interface HistoryPanelProps {
   projectId: string;
+  onLoadResult?: () => void;
 }
 
-export function HistoryPanel({ projectId }: HistoryPanelProps) {
+export function HistoryPanel({ projectId, onLoadResult }: HistoryPanelProps) {
   const { data, isLoading } = useGenerations(projectId);
   const setCode = useGenerateStore((s) => s.setCode);
   const setImageUrl = useGenerateStore((s) => s.setImageUrl);
@@ -45,7 +46,10 @@ export function HistoryPanel({ projectId }: HistoryPanelProps) {
         imageUrl: detail.image_url || "",
         reviewPassed: true,
         reviewRounds: 0,
+        reviewCritique: "",
+        reviewIssues: [],
       });
+      onLoadResult?.();
     } catch {
       // silently fail
     } finally {

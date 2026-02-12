@@ -25,6 +25,8 @@ interface GenerateState {
     imageUrl: string;
     reviewPassed: boolean;
     reviewRounds: number;
+    reviewCritique: string;
+    reviewIssues: string[];
   } | null;
   explanation: string;
   generateError: string | null;

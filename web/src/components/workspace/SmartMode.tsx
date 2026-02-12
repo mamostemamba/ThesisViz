@@ -14,7 +14,7 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { useAnalyze, useGenerateCreate } from "@/lib/queries";
 import { connectGeneration, type WSMessage } from "@/lib/ws";
-import { ProgressStream } from "./ProgressStream";
+import { ProgressStream, collectImageSnapshots } from "./ProgressStream";
 import { ResultPanel } from "./ResultPanel";
 import { generateCreate } from "@/lib/api";
 import { Search, Sparkles, Loader2 } from "lucide-react";
@@ -27,8 +27,11 @@ interface SmartModeProps {
 export function SmartMode({ projectId }: SmartModeProps) {
   const [text, setText] = useState("");
   const [thesisTitle, setThesisTitle] = useState("");
+  const [thesisAbstract, setThesisAbstract] = useState("");
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
+  const [editingPrompt, setEditingPrompt] = useState<string | null>(null);
+  const [parentCode, setParentCode] = useState<string | undefined>(undefined);
 
   const language = useSettingsStore((s) => s.language);
   const format = useSettingsStore((s) => s.format);
@@ -51,6 +54,8 @@ export function SmartMode({ projectId }: SmartModeProps) {
 
   const analyzeMutation = useAnalyze();
   const wsCleanupRef = useRef<(() => void) | null>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
   // Cleanup WS on unmount
   useEffect(() => {
@@ -59,24 +64,51 @@ export function SmartMode({ projectId }: SmartModeProps) {
     };
   }, []);
 
+  // Auto-scroll to progress when generation starts or new messages arrive
+  useEffect(() => {
+    if (isGenerating && progress.length > 0) {
+      progressRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [isGenerating, progress.length]);
+
+  // Auto-scroll to result when done
+  useEffect(() => {
+    if (result) {
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [result]);
+
   const handleAnalyze = useCallback(async () => {
     if (!text.trim()) return;
     setRecommendations([]);
     setSelectedRec(null);
+    setEditingPrompt(null);
     resetGeneration();
 
     const res = await analyzeMutation.mutateAsync({
       text,
       language,
       thesis_title: thesisTitle || undefined,
+      thesis_abstract: thesisAbstract || undefined,
       model,
     });
     setRecommendations(res.recommendations || []);
-  }, [text, language, thesisTitle, model, analyzeMutation, resetGeneration]);
+  }, [text, language, thesisTitle, thesisAbstract, model, analyzeMutation, resetGeneration]);
 
   const startGeneration = useCallback(
-    async (prompt: string, fmt?: string) => {
-      resetGeneration();
+    async (prompt: string, fmt?: string, keepResult?: boolean) => {
+      if (keepResult) {
+        // Refine: keep old result visible, only clear progress/error
+        useGenerateStore.setState({
+          taskId: null,
+          phase: "",
+          progress: [],
+          generateError: null,
+        });
+      } else {
+        resetGeneration();
+        setParentCode(undefined);
+      }
       setIsGenerating(true);
 
       try {
@@ -87,6 +119,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
           language,
           color_scheme: colorScheme,
           thesis_title: thesisTitle || undefined,
+          thesis_abstract: thesisAbstract || undefined,
           model,
         });
 
@@ -109,6 +142,8 @@ export function SmartMode({ projectId }: SmartModeProps) {
                 imageUrl: msg.data.image_url || "",
                 reviewPassed: msg.data.review_passed || false,
                 reviewRounds: msg.data.review_rounds || 0,
+                reviewCritique: msg.data.critique || "",
+                reviewIssues: msg.data.issues || [],
               });
               setIsGenerating(false);
             }
@@ -138,6 +173,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
       language,
       colorScheme,
       thesisTitle,
+      thesisAbstract,
       model,
       resetGeneration,
       setTaskId,
@@ -149,18 +185,14 @@ export function SmartMode({ projectId }: SmartModeProps) {
     ]
   );
 
-  const handleGenerate = useCallback(() => {
-    if (selectedRec) {
-      startGeneration(selectedRec.drawing_prompt, selectedRec.format || format);
-    }
-  }, [selectedRec, format, startGeneration]);
-
   const handleRefine = useCallback(
     (modification: string) => {
       if (!result) return;
+      setParentCode(result.code);
       startGeneration(
         `Modify this existing code:\n\n${result.code}\n\nModification: ${modification}`,
-        result.format
+        result.format,
+        true // keep old result visible during refine
       );
     },
     [result, startGeneration]
@@ -168,45 +200,51 @@ export function SmartMode({ projectId }: SmartModeProps) {
 
   return (
     <div className="space-y-6">
-      {/* Input section */}
-      <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">描述你的论文</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <input
-              type="text"
-              placeholder="论文标题（可选）"
-              value={thesisTitle}
-              onChange={(e) => setThesisTitle(e.target.value)}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-            />
-            <Textarea
-              placeholder="粘贴论文摘要或描述你需要的图表..."
-              className="min-h-[150px]"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
-            <Button
-              onClick={handleAnalyze}
-              disabled={analyzeMutation.isPending || !text.trim()}
-              className="w-full"
-            >
-              {analyzeMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="mr-2 h-4 w-4" />
-              )}
-              {analyzeMutation.isPending ? "分析中..." : "分析"}
-            </Button>
-          </CardContent>
-        </Card>
+      {/* Step 1: Input */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">描述你的论文</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <input
+            type="text"
+            placeholder="论文标题（可选）"
+            value={thesisTitle}
+            onChange={(e) => setThesisTitle(e.target.value)}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+          />
+          <Textarea
+            placeholder="论文摘要（可选）"
+            className="min-h-[80px]"
+            value={thesisAbstract}
+            onChange={(e) => setThesisAbstract(e.target.value)}
+          />
+          <Textarea
+            placeholder="粘贴需要配图的段落内容..."
+            className="min-h-[150px]"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <Button
+            onClick={handleAnalyze}
+            disabled={analyzeMutation.isPending || !text.trim()}
+            className="w-full"
+          >
+            {analyzeMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="mr-2 h-4 w-4" />
+            )}
+            {analyzeMutation.isPending ? "分析中..." : "分析"}
+          </Button>
+        </CardContent>
+      </Card>
 
-        {/* Recommendations */}
-        {recommendations.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold">推荐图表</h3>
+      {/* Step 2: Recommendations */}
+      {recommendations.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold">推荐图表</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {recommendations.map((rec, i) => (
               <Card
                 key={i}
@@ -215,7 +253,10 @@ export function SmartMode({ projectId }: SmartModeProps) {
                     ? "border-primary bg-primary/5"
                     : "hover:border-muted-foreground/30"
                 }`}
-                onClick={() => setSelectedRec(rec)}
+                onClick={() => {
+                  setSelectedRec(rec);
+                  setEditingPrompt(rec.drawing_prompt);
+                }}
               >
                 <CardContent className="p-3 space-y-1">
                   <div className="flex items-center justify-between">
@@ -230,9 +271,30 @@ export function SmartMode({ projectId }: SmartModeProps) {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Prompt editing */}
+      {editingPrompt !== null && selectedRec && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">画图提示词（可编辑）</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea
+              value={editingPrompt}
+              onChange={(e) => setEditingPrompt(e.target.value)}
+              className="min-h-[120px] text-sm"
+            />
             <Button
-              onClick={handleGenerate}
-              disabled={!selectedRec || isGenerating}
+              onClick={() =>
+                startGeneration(
+                  editingPrompt,
+                  selectedRec.format || format
+                )
+              }
+              disabled={!editingPrompt.trim() || isGenerating}
               className="w-full"
             >
               {isGenerating ? (
@@ -240,15 +302,17 @@ export function SmartMode({ projectId }: SmartModeProps) {
               ) : (
                 <Sparkles className="mr-2 h-4 w-4" />
               )}
-              {isGenerating ? "生成中..." : "生成所选图表"}
+              {isGenerating ? "生成中..." : "确认生成"}
             </Button>
-          </div>
-        )}
-      </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Progress */}
-      {isGenerating && progress.length > 0 && (
-        <ProgressStream messages={progress} phase={phase} />
+      {/* Progress — keep visible after completion so review results remain */}
+      {progress.length > 0 && (
+        <div ref={progressRef}>
+          <ProgressStream messages={progress} phase={phase} />
+        </div>
       )}
 
       {/* Error */}
@@ -260,6 +324,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
 
       {/* Result */}
       {result && (
+        <div ref={resultRef}>
         <ResultPanel
           code={result.code}
           format={result.format}
@@ -267,9 +332,14 @@ export function SmartMode({ projectId }: SmartModeProps) {
           imageUrl={result.imageUrl}
           reviewPassed={result.reviewPassed}
           reviewRounds={result.reviewRounds}
+          reviewCritique={result.reviewCritique}
+          reviewIssues={result.reviewIssues}
           onRefine={handleRefine}
           isRefining={isGenerating}
+          parentCode={parentCode}
+          imageSnapshots={collectImageSnapshots(progress)}
         />
+        </div>
       )}
     </div>
   );

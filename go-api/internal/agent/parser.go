@@ -52,9 +52,17 @@ func ParseMatplotlib(raw string) (string, error) {
 		return strings.TrimSpace(code), nil
 	}
 
-	// Fallback: look for import lines
-	if strings.Contains(raw, "import matplotlib") || strings.Contains(raw, "import numpy") {
-		return strings.TrimSpace(raw), nil
+	// Fallback: look for matplotlib/numpy signatures in raw text
+	indicators := []string{
+		"import matplotlib", "import numpy",
+		"plt.figure", "plt.subplots", "plt.plot", "plt.bar",
+		"plt.scatter", "plt.hist", "plt.pie", "plt.style",
+		"fig,", "fig =", "ax.set_", "ax.plot",
+	}
+	for _, ind := range indicators {
+		if strings.Contains(raw, ind) {
+			return strings.TrimSpace(raw), nil
+		}
 	}
 
 	return "", fmt.Errorf("no Python/Matplotlib code found in LLM output")
@@ -67,7 +75,7 @@ func ParseJSON(raw string) (string, error) {
 		return strings.TrimSpace(code), nil
 	}
 
-	// Fallback: find first { or [ and match to closing brace/bracket
+	// Fallback: prefer object { } first, then array [ ]
 	trimmed := strings.TrimSpace(raw)
 	if json := extractBracketed(trimmed, '{', '}'); json != "" {
 		return json, nil
@@ -106,7 +114,8 @@ func extractCodeBlock(raw string, langs ...string) string {
 	return ""
 }
 
-var tikzEnvRe = regexp.MustCompile(`(?s)(\\begin\{tikzpicture\}.*?\\end\{tikzpicture\})`)
+// Greedy .* so we match the OUTERMOST \end{tikzpicture} (handles nested envs).
+var tikzEnvRe = regexp.MustCompile(`(?s)(\\begin\{tikzpicture\}.*\\end\{tikzpicture\})`)
 
 func extractTikZEnv(s string) string {
 	m := tikzEnvRe.FindString(s)

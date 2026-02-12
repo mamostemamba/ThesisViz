@@ -35,7 +35,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("MINIO_SECRET_KEY", "minioadmin")
 	viper.SetDefault("MINIO_BUCKET", "thesisviz")
 	viper.SetDefault("MINIO_USE_SSL", false)
-	viper.SetDefault("GEMINI_MODEL", "gemini-2.5-flash")
+	viper.SetDefault("GEMINI_MODEL", "gemini-3-pro-preview")
 
 	// .env file is optional; env vars take precedence
 	_ = viper.ReadInConfig()

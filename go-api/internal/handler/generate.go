@@ -40,7 +40,7 @@ func (h *GenerateHandler) Analyze(c *gin.Context) {
 	}
 
 	if req.Language == "" {
-		req.Language = "en"
+		req.Language = "zh"
 	}
 
 	recs, err := h.agentSvc.Analyze(c.Request.Context(), service.AnalyzeRequest{
@@ -78,10 +78,10 @@ func (h *GenerateHandler) Create(c *gin.Context) {
 	}
 
 	if req.Language == "" {
-		req.Language = "en"
+		req.Language = "zh"
 	}
 	if req.ColorScheme == "" {
-		req.ColorScheme = "academic_blue"
+		req.ColorScheme = "drawio"
 	}
 
 	taskID := uuid.New().String()
@@ -134,10 +134,10 @@ func (h *GenerateHandler) Refine(c *gin.Context) {
 	}
 
 	if req.Language == "" {
-		req.Language = "en"
+		req.Language = "zh"
 	}
 	if req.ColorScheme == "" {
-		req.ColorScheme = "academic_blue"
+		req.ColorScheme = "drawio"
 	}
 
 	taskID := uuid.New().String()

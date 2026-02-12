@@ -15,7 +15,7 @@ def health():
 
 class RenderRequest(BaseModel):
     code: str
-    timeout: int = 30
+    timeout: int = 60
 
 
 @app.post("/render/matplotlib")
