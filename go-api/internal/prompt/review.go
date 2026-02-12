@@ -21,6 +21,8 @@ func ReviewSystem(language string) string {
 7. 连线穿越文字或节点（线条/箭头穿过其他方块或文字区域，这是严重问题）
 8. 斜线交叉（非相邻节点之间使用了对角线直连，导致线条交叉混乱）
 
+8.5. 原始代码泄露（节点内显示了 LaTeX 命令原文，如 \textbf{...}、\begin{tabular}、\footnotesize 等反斜杠命令，而非正常渲染的文字）——这是严重问题
+
 二、内容完整性检查项（如果用户提供了画图提示词，必须对照检查）：
 9. 内容缺失（提示词中要求的模块、节点、标签、文字等在图中缺失）
 10. 内容不符（图中的元素与提示词描述的不一致，如名称错误、关系错误）
@@ -49,6 +51,7 @@ passed 判定规则：
 14. 不要因为代码中写了 \draw[decorate] 就假设图上一定显示了——必须在图片中实际确认
 
 审查严格度要求：
+- 原始代码泄露（节点中可见反斜杠命令）= 必须报告（严重问题）
 - 连线穿越节点/文字 = 必须报告（严重问题）
 - 斜线交叉混乱 = 必须报告（严重问题）
 - 文字重叠或截断 = 必须报告
@@ -71,6 +74,8 @@ A. Layout checks:
 6. Alignment issues (elements not properly aligned, skewed layout)
 7. Lines crossing over nodes/text (arrows or lines pass through other boxes or text regions — this is a SEVERE issue)
 8. Diagonal line crossings (non-adjacent nodes connected with diagonal straight lines, causing visual clutter)
+
+8.5. Raw code leakage (nodes display raw LaTeX commands such as \textbf{...}, \begin{tabular}, \footnotesize instead of properly rendered text) — this is a SEVERE issue
 
 B. Content completeness checks (if a drawing prompt is provided, compare against it):
 9. Missing content (modules, nodes, labels, or text required by the prompt are absent)
@@ -100,6 +105,7 @@ C. Thin lines and decorative elements (special attention):
 14. Do NOT assume decorative elements exist just because the code contains \draw[decorate] — you MUST visually confirm in the image
 
 Strictness requirements:
+- Raw code leakage (backslash commands visible in nodes) = MUST report (severe)
 - Lines crossing over nodes/text = MUST report (severe)
 - Diagonal line crossings/clutter = MUST report (severe)
 - Text overlap or truncation = MUST report

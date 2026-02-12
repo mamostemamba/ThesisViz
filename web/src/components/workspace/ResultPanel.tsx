@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Copy,
   Check,
@@ -14,12 +21,13 @@ import {
   ZoomIn,
   MessageSquareText,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { ImageLightbox } from "./ImageLightbox";
 import { MermaidRenderer } from "./MermaidRenderer";
 import { DiffViewer } from "./DiffViewer";
 import { useSettingsStore } from "@/stores/useSettingsStore";
-import { exportTeX } from "@/lib/api";
+import { exportTeX, renderCode } from "@/lib/api";
 
 export interface ImageSnapshot {
   round: number;
@@ -56,11 +64,64 @@ export function ResultPanel({
   reviewIssues,
 }: ResultPanelProps) {
   const colorScheme = useSettingsStore((s) => s.colorScheme);
+  const setColorScheme = useSettingsStore((s) => s.setColorScheme);
+  const customColors = useSettingsStore((s) => s.customColors);
   const language = useSettingsStore((s) => s.language);
   const [modification, setModification] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [localImageUrl, setLocalImageUrl] = useState<string | null>(null);
+  const [rerendering, setRerendering] = useState(false);
   const mermaidContainerRef = useRef<HTMLDivElement>(null);
+  const prevSchemeRef = useRef(colorScheme);
+  const prevCustomRef = useRef(customColors);
+
+  const displayImageUrl = localImageUrl || imageUrl;
+
+  // Reset local image when a new generation arrives
+  useEffect(() => {
+    setLocalImageUrl(null);
+  }, [imageUrl]);
+
+  // Watch for color scheme changes and re-render (TikZ/Matplotlib only)
+  useEffect(() => {
+    const schemeChanged = prevSchemeRef.current !== colorScheme;
+    const customChanged =
+      JSON.stringify(prevCustomRef.current) !== JSON.stringify(customColors);
+    prevSchemeRef.current = colorScheme;
+    prevCustomRef.current = customColors;
+
+    if (!(schemeChanged || customChanged) || !code || format === "mermaid")
+      return;
+
+    let cancelled = false;
+    setRerendering(true);
+
+    renderCode({
+      code,
+      format,
+      language,
+      color_scheme: colorScheme,
+      custom_colors:
+        colorScheme === "custom" && customColors ? customColors : undefined,
+    })
+      .then((result) => {
+        if (!cancelled && result.image_url) {
+          setLocalImageUrl(result.image_url);
+        }
+      })
+      .catch(() => {
+        // Keep existing image on error
+      })
+      .finally(() => {
+        if (!cancelled) setRerendering(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colorScheme, customColors, code, format, language]);
 
   const handleCopy = useCallback(
     async (label: string, text: string) => {
@@ -96,9 +157,9 @@ export function ResultPanel({
       link.download = "figure.png";
       link.href = dataUrl;
       link.click();
-    } else if (imageUrl) {
+    } else if (displayImageUrl) {
       // For TikZ/Matplotlib, download the server image
-      const response = await fetch(imageUrl);
+      const response = await fetch(displayImageUrl);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -107,7 +168,7 @@ export function ResultPanel({
       link.click();
       URL.revokeObjectURL(url);
     }
-  }, [format, imageUrl]);
+  }, [format, displayImageUrl]);
 
   const handleDownloadSVG = useCallback(() => {
     const svgEl = mermaidContainerRef.current?.querySelector("svg");
@@ -146,6 +207,23 @@ export function ResultPanel({
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold">结果</h3>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Select value={colorScheme} onValueChange={setColorScheme}>
+                <SelectTrigger className="h-7 w-[130px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="drawio">Draw.io 经典</SelectItem>
+                  <SelectItem value="professional_blue">专业蓝</SelectItem>
+                  <SelectItem value="bold_contrast">高对比</SelectItem>
+                  <SelectItem value="minimal_mono">极简黑白</SelectItem>
+                  <SelectItem value="modern_teal">现代青</SelectItem>
+                  <SelectItem value="soft_pastel">柔和粉彩</SelectItem>
+                  <SelectItem value="warm_earth">暖色大地</SelectItem>
+                  <SelectItem value="cyber_dark">深色科技</SelectItem>
+                  <SelectItem value="custom">自定义</SelectItem>
+                </SelectContent>
+              </Select>
+              {rerendering && <Loader2 className="h-3 w-3 animate-spin" />}
               {reviewPassed ? (
                 <span className="text-green-600">审查通过</span>
               ) : (
@@ -159,16 +237,16 @@ export function ResultPanel({
             <div ref={mermaidContainerRef}>
               <MermaidRenderer code={code} colorScheme={colorScheme} />
             </div>
-          ) : imageUrl ? (
+          ) : displayImageUrl ? (
             <div className="relative group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={imageUrl}
+                src={displayImageUrl}
                 alt="Generated figure"
                 className="max-h-[400px] w-full rounded border object-contain"
               />
               <button
-                onClick={() => setLightboxSrc(imageUrl)}
+                onClick={() => setLightboxSrc(displayImageUrl)}
                 className="absolute top-2 right-2 rounded-md bg-black/50 p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/70"
                 title="放大查看"
               >
@@ -259,7 +337,7 @@ export function ResultPanel({
               </Button>
             )}
 
-            {(imageUrl || format === "mermaid") && (
+            {(displayImageUrl || format === "mermaid") && (
               <Button variant="outline" size="sm" onClick={handleDownloadPNG}>
                 <Download className="mr-1 h-3 w-3" />
                 下载 PNG

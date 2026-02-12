@@ -93,7 +93,25 @@ MATRIX RULES (non-negotiable):
 - If you need more space: increase row sep (up to 2.5cm) or column sep (up to 3cm).
 - If labels are long: use text width=4cm or 5cm on individual nodes.
 - For many columns (>4): reduce text width to 2.5cm and column sep to 1.5cm.
-- For long text labels, force manual line breaks with \\. Example: |[fill=primaryFill, draw=primaryLine]| Distributed \\ Ledger \\ Technology. Do NOT rely on automatic wrapping alone — it causes unpredictable column widths.
+- For long text labels in \node[...]{...}; syntax, you may use \\ for line breaks.
+  In matrix |[style]| cells, \\ is the ROW separator — do NOT use it for line breaks inside cell text.
+  Instead, set text width on the node and let automatic wrapping handle it, or split into multiple rows.
+
+=== NODE TEXT RULES (prevent raw code leakage in rendered output) ===
+FORBIDDEN inside node text (especially matrix |[style]| cells):
+- \textbf{}, \textit{}, \underline{}, \emph{} → use {\bfseries text} or {\itshape text} instead
+- \begin{...}\end{...} environments (tabular, itemize, enumerate, etc.) → NEVER inside nodes
+- \footnotesize, \scriptsize, \tiny, \small, \large, \Large → font sizes are set by styles, do NOT add them
+- \text{}, \mbox{}, \makebox{}, \parbox{} → not needed inside nodes, just write plain text
+- \url{}, \href{} → just write the URL as plain text
+- Raw special characters: _ %% # $ & ~ ^ → escape as \_ \%% \# \$ \& \textasciitilde \textasciicircum
+- Do NOT use \\ inside |[style]| node text — it conflicts with the matrix row separator
+
+SAFE inside node text:
+- Plain text (Chinese or English)
+- {\bfseries bold text} or {\itshape italic text} (brace-grouped font switches, NOT \textbf)
+- Simple inline math: $x^2$, $n \times m$ (short expressions only)
+- \\ ONLY inside standalone \node[...]{...}; (NOT inside matrix |[style]| cells)
 
 TEMPLATE (simple flowchart — linear chain, ≤5 nodes):
 \begin{tikzpicture}[
