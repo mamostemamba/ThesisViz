@@ -3,13 +3,21 @@ package handler
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/thesisviz/go-api/internal/service"
 	"github.com/thesisviz/go-api/internal/storage"
 	"github.com/thesisviz/go-api/internal/ws"
+)
+
+const (
+	defaultLanguage    = "zh"
+	defaultColorScheme = "drawio"
+	taskTimeout        = 15 * time.Minute
 )
 
 type GenerateHandler struct {
@@ -17,10 +25,11 @@ type GenerateHandler struct {
 	genSvc   *service.GenerationService
 	storage  *storage.MinIOStorage
 	hub      *ws.Hub
+	logger   *zap.Logger
 }
 
-func NewGenerateHandler(agentSvc *service.AgentService, genSvc *service.GenerationService, store *storage.MinIOStorage, hub *ws.Hub) *GenerateHandler {
-	return &GenerateHandler{agentSvc: agentSvc, genSvc: genSvc, storage: store, hub: hub}
+func NewGenerateHandler(agentSvc *service.AgentService, genSvc *service.GenerationService, store *storage.MinIOStorage, hub *ws.Hub, logger *zap.Logger) *GenerateHandler {
+	return &GenerateHandler{agentSvc: agentSvc, genSvc: genSvc, storage: store, hub: hub, logger: logger}
 }
 
 type analyzeRequest struct {
@@ -40,7 +49,7 @@ func (h *GenerateHandler) Analyze(c *gin.Context) {
 	}
 
 	if req.Language == "" {
-		req.Language = "zh"
+		req.Language = defaultLanguage
 	}
 
 	recs, err := h.agentSvc.Analyze(c.Request.Context(), service.AnalyzeRequest{
@@ -78,18 +87,20 @@ func (h *GenerateHandler) Create(c *gin.Context) {
 	}
 
 	if req.Language == "" {
-		req.Language = "zh"
+		req.Language = defaultLanguage
 	}
 	if req.ColorScheme == "" {
-		req.ColorScheme = "drawio"
+		req.ColorScheme = defaultColorScheme
 	}
 
 	taskID := uuid.New().String()
 
 	// Copy request data for background goroutine — c.Request.Context() is
-	// canceled once the HTTP response is sent, so we use a detached context.
+	// canceled once the HTTP response is sent, so we use a detached context
+	// with a timeout to prevent runaway goroutines.
 	go func() {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
+		defer cancel()
 		pushFn := func(msg service.ProgressMsg) {
 			_ = h.hub.Send(taskID, msg)
 		}
@@ -106,6 +117,7 @@ func (h *GenerateHandler) Create(c *gin.Context) {
 		}, pushFn)
 
 		if err != nil {
+			h.logger.Error("generation failed", zap.String("task_id", taskID), zap.Error(err))
 			_ = h.hub.Send(taskID, service.ProgressMsg{
 				Type:  "error",
 				Phase: "done",
@@ -134,16 +146,17 @@ func (h *GenerateHandler) Refine(c *gin.Context) {
 	}
 
 	if req.Language == "" {
-		req.Language = "zh"
+		req.Language = defaultLanguage
 	}
 	if req.ColorScheme == "" {
-		req.ColorScheme = "drawio"
+		req.ColorScheme = defaultColorScheme
 	}
 
 	taskID := uuid.New().String()
 
 	go func() {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
+		defer cancel()
 		pushFn := func(msg service.ProgressMsg) {
 			_ = h.hub.Send(taskID, msg)
 		}
@@ -157,6 +170,7 @@ func (h *GenerateHandler) Refine(c *gin.Context) {
 		}, pushFn)
 
 		if err != nil {
+			h.logger.Error("refine failed", zap.String("task_id", taskID), zap.Error(err))
 			_ = h.hub.Send(taskID, service.ProgressMsg{
 				Type:  "error",
 				Phase: "done",

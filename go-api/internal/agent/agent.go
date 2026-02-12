@@ -2,6 +2,9 @@ package agent
 
 import "context"
 
+// defaultTemperature is the LLM temperature used for code generation.
+const defaultTemperature float32 = 0.4
+
 // Agent is the interface for code generation agents (TikZ, Matplotlib, Mermaid).
 type Agent interface {
 	// Generate creates code from a natural language prompt.
@@ -21,4 +24,22 @@ type AgentOpts struct {
 	ThesisTitle    string
 	ThesisAbstract string
 	Model          string
+}
+
+// buildIdentity constructs a thesis identity string from title and abstract.
+func buildIdentity(title, abstract string) string {
+	if title == "" && abstract == "" {
+		return ""
+	}
+	identity := ""
+	if title != "" {
+		identity += "Thesis: " + title
+	}
+	if abstract != "" {
+		if identity != "" {
+			identity += ". "
+		}
+		identity += "Abstract: " + abstract
+	}
+	return identity
 }

@@ -24,7 +24,7 @@ func (a *MatplotlibAgent) Generate(ctx context.Context, userPrompt string, opts 
 	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
 	sysPrompt := prompt.Matplotlib(opts.Language, scheme.TikZPrompt, scheme.MatplotlibColors, identity)
 
-	raw, err := a.llm.Generate(ctx, sysPrompt, userPrompt, 0.4, opts.Model)
+	raw, err := a.llm.Generate(ctx, sysPrompt, userPrompt, defaultTemperature, opts.Model)
 	if err != nil {
 		return "", fmt.Errorf("matplotlib generate: %w", err)
 	}
@@ -38,7 +38,7 @@ func (a *MatplotlibAgent) Refine(ctx context.Context, code, modification string,
 
 	userMsg := fmt.Sprintf("Here is the current Python/Matplotlib code:\n\n%s\n\nPlease fix these issues:\n%s\n\nOutput ONLY the complete fixed Python code.", code, modification)
 
-	raw, err := a.llm.Generate(ctx, sysPrompt, userMsg, 0.4, opts.Model)
+	raw, err := a.llm.Generate(ctx, sysPrompt, userMsg, defaultTemperature, opts.Model)
 	if err != nil {
 		return "", fmt.Errorf("matplotlib refine: %w", err)
 	}
@@ -52,7 +52,7 @@ func (a *MatplotlibAgent) RefineWithImage(ctx context.Context, code, modificatio
 
 	userMsg := fmt.Sprintf("Here is the current Python/Matplotlib code:\n\n%s\n\nThe rendered result is shown in the attached image. Please fix these issues:\n%s\n\nOutput ONLY the complete fixed Python code.", code, modification)
 
-	raw, err := a.llm.GenerateWithImage(ctx, sysPrompt, userMsg, img, 0.4, opts.Model)
+	raw, err := a.llm.GenerateWithImage(ctx, sysPrompt, userMsg, img, defaultTemperature, opts.Model)
 	if err != nil {
 		return "", fmt.Errorf("matplotlib refine with image: %w", err)
 	}

@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+
+	"go.uber.org/zap"
 
 	"github.com/thesisviz/go-api/internal/llm"
 	"github.com/thesisviz/go-api/internal/prompt"
@@ -20,30 +21,31 @@ type Recommendation struct {
 }
 
 type RouterAgent struct {
-	llm *llm.GeminiClient
+	llm    *llm.GeminiClient
+	logger *zap.Logger
 }
 
-func NewRouterAgent(llm *llm.GeminiClient) *RouterAgent {
-	return &RouterAgent{llm: llm}
+func NewRouterAgent(llm *llm.GeminiClient, logger *zap.Logger) *RouterAgent {
+	return &RouterAgent{llm: llm, logger: logger}
 }
 
 // Analyze examines thesis text and returns figure recommendations.
 func (a *RouterAgent) Analyze(ctx context.Context, text string, opts AgentOpts) ([]Recommendation, error) {
 	sysPrompt := prompt.Router(opts.Language, opts.ThesisTitle, opts.ThesisAbstract)
 
-	raw, err := a.llm.Generate(ctx, sysPrompt, text, 0.4, opts.Model)
+	raw, err := a.llm.Generate(ctx, sysPrompt, text, defaultTemperature, opts.Model)
 	if err != nil {
 		return nil, fmt.Errorf("router analyze: %w", err)
 	}
 
-	log.Printf("[router] raw LLM response (first 2000 chars): %.2000s", raw)
+	a.logger.Debug("router raw LLM response", zap.String("raw", truncate(raw, 2000)))
 
 	jsonStr, err := ParseJSON(raw)
 	if err != nil {
 		return nil, fmt.Errorf("router parse json: %w (raw response: %.500s)", err, raw)
 	}
 
-	log.Printf("[router] extracted JSON (first 2000 chars): %.2000s", jsonStr)
+	a.logger.Debug("router extracted JSON", zap.String("json", truncate(jsonStr, 2000)))
 
 	// Try array first
 	var recs []Recommendation
@@ -64,11 +66,19 @@ func (a *RouterAgent) Analyze(ctx context.Context, text string, opts AgentOpts) 
 		if _, hasTitle := wrapper["title"]; hasTitle {
 			var single Recommendation
 			if err := json.Unmarshal([]byte(jsonStr), &single); err == nil && single.Title != "" {
-				log.Printf("[router] model returned single object instead of array, wrapping it")
+				a.logger.Info("router model returned single object instead of array, wrapping it")
 				return []Recommendation{single}, nil
 			}
 		}
 	}
 
 	return nil, fmt.Errorf("router unmarshal: could not parse recommendations (json: %.500s)", jsonStr)
+}
+
+// truncate returns at most maxLen characters of s.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
 }

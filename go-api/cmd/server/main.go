@@ -111,12 +111,12 @@ func main() {
 			"matplotlib": agent.NewMatplotlibAgent(geminiClient),
 			"mermaid":    agent.NewMermaidAgent(geminiClient),
 		}
-		routerAgent := agent.NewRouterAgent(geminiClient)
+		routerAgent := agent.NewRouterAgent(geminiClient, logger)
 
 		agentSvc := service.NewAgentService(geminiClient, renderSvc, generationSvc, store, agents, routerAgent, logger)
 
 		wsHub := ws.NewHub(logger)
-		generateHandler = handler.NewGenerateHandler(agentSvc, generationSvc, store, wsHub)
+		generateHandler = handler.NewGenerateHandler(agentSvc, generationSvc, store, wsHub, logger)
 		wsHandler = handler.NewWSHandler(wsHub, logger)
 	} else {
 		logger.Warn("GEMINI_API_KEY not set — AI generation endpoints disabled")
