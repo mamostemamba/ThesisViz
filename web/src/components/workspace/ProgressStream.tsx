@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import type { WSMessage } from "@/lib/ws";
 import { DiffViewer } from "./DiffViewer";
 import { CheckCircle2, Circle, Loader2, AlertCircle, XCircle, Code2, Image as ImageIcon, GitCompareArrows, ZoomIn, MessageSquareText } from "lucide-react";
@@ -18,12 +18,75 @@ const phaseLabels: Record<string, string> = {
   compiling: "编译渲染",
   reviewing: "视觉审查",
   rerolling: "重新生成",
-  fixing: "修复问题",
+  fixing: "润色修复",
   explaining: "代码说明",
   done: "完成",
 };
 
-function PhaseIcon({ phase, currentPhase }: { phase: string; currentPhase: string }) {
+// ── Phase timing helpers ──
+
+interface PhaseTiming {
+  startTs: number;
+  endTs?: number;
+}
+
+/** Build a map of phase → { startTs, endTs } from timestamped messages. */
+function buildPhaseTimings(messages: WSMessage[]): Map<string, PhaseTiming> {
+  const map = new Map<string, PhaseTiming>();
+  for (const m of messages) {
+    const ts = m._ts;
+    if (!ts) continue;
+    const existing = map.get(m.phase);
+    if (!existing) {
+      map.set(m.phase, { startTs: ts, endTs: undefined });
+    }
+  }
+  // Set endTs for each phase = startTs of the next phase that appeared
+  const ordered = phaseOrder.filter((p) => map.has(p));
+  for (let i = 0; i < ordered.length - 1; i++) {
+    const cur = map.get(ordered[i])!;
+    const next = map.get(ordered[i + 1])!;
+    cur.endTs = next.startTs;
+  }
+  return map;
+}
+
+function formatElapsed(ms: number): string {
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const remSecs = secs % 60;
+  return `${mins}m${remSecs.toString().padStart(2, "0")}s`;
+}
+
+/** Displays elapsed time for a phase. Ticks every second if active. */
+function PhaseTimer({ timing, isActive }: { timing: PhaseTiming | undefined; isActive: boolean }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!isActive) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isActive]);
+
+  if (!timing) return null;
+
+  const elapsed = (isActive ? now : (timing.endTs ?? now)) - timing.startTs;
+  if (elapsed < 0) return null;
+
+  return (
+    <span className="text-xs text-muted-foreground tabular-nums">
+      {formatElapsed(elapsed)}
+    </span>
+  );
+}
+
+// ── Phase icon ──
+
+function PhaseIcon({ phase, currentPhase, appeared }: { phase: string; currentPhase: string; appeared: boolean }) {
+  if (!appeared) {
+    return <Circle className="h-4 w-4 text-muted-foreground" />;
+  }
   const currentIdx = phaseOrder.indexOf(currentPhase);
   const phaseIdx = phaseOrder.indexOf(phase);
 
@@ -35,6 +98,8 @@ function PhaseIcon({ phase, currentPhase }: { phase: string; currentPhase: strin
   }
   return <Circle className="h-4 w-4 text-muted-foreground" />;
 }
+
+// ── Snapshot collectors ──
 
 /** Extract all distinct image snapshots from progress messages, in order. */
 export function collectImageSnapshots(messages: WSMessage[]) {
@@ -49,13 +114,15 @@ export function collectImageSnapshots(messages: WSMessage[]) {
     const round = m.data.round || 0;
     let label: string;
     if (m.phase === "compiling") {
-      label = "初次编译渲染";
+      label = "初次编译";
     } else if (m.phase === "rerolling") {
-      label = "重新生成";
-    } else if (m.phase === "reviewing" || m.phase === "fixing") {
-      label = `第 ${round} 轮审查`;
+      label = `第 ${round} 次重画`;
+    } else if (m.phase === "fixing") {
+      label = `第 ${round} 轮润色`;
+    } else if (m.phase === "reviewing") {
+      label = "审查结果";
     } else {
-      label = `渲染预览`;
+      label = "渲染预览";
     }
     snapshots.push({ round, imageUrl: url, label });
   }
@@ -70,17 +137,18 @@ function collectCodeSnapshots(messages: WSMessage[]) {
   for (const m of messages) {
     const code = m.data.code;
     if (!code) continue;
-    // Skip if same as previous
     if (snapshots.length > 0 && snapshots[snapshots.length - 1].code === code) continue;
 
     if (m.phase === "generating") {
       snapshots.push({ code, label: "初始生成" });
+    } else if (m.phase === "rerolling") {
+      const round = m.data.round || snapshots.length;
+      snapshots.push({ code, label: `第 ${round} 次重画` });
     } else if (m.phase === "fixing") {
       const round = m.data.round || snapshots.length;
-      snapshots.push({ code, label: `第 ${round} 轮修复` });
+      snapshots.push({ code, label: `第 ${round} 轮润色` });
     } else if (m.phase === "reviewing") {
-      const round = m.data.round || snapshots.length;
-      snapshots.push({ code, label: `第 ${round} 轮审查后` });
+      snapshots.push({ code, label: "审查后" });
     } else {
       snapshots.push({ code, label: m.phase });
     }
@@ -88,6 +156,8 @@ function collectCodeSnapshots(messages: WSMessage[]) {
 
   return snapshots;
 }
+
+// ── Small components ──
 
 function ImageWithLoading({ src, alt, className }: { src: string; alt: string; className?: string }) {
   const [loaded, setLoaded] = useState(false);
@@ -136,16 +206,28 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
+// ── Per-phase helpers ──
+
+function getPhaseStatus(messages: WSMessage[], targetPhase: string): string | undefined {
+  return messages
+    .filter((m) => m.phase === targetPhase && m.data.message)
+    .at(-1)?.data.message;
+}
+
+function getPhaseScore(messages: WSMessage[], targetPhase: string): number | undefined {
+  return messages
+    .filter((m) => m.phase === targetPhase && m.data.score && m.data.score > 0)
+    .at(-1)?.data.score;
+}
+
+// ── Main component ──
+
 export function ProgressStream({ messages, phase }: ProgressStreamProps) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const latestIssues = messages
     .filter((m) => m.data.issues && m.data.issues.length > 0)
     .at(-1)?.data.issues;
-
-  const latestRound = messages
-    .filter((m) => m.data.round && m.data.round > 0)
-    .at(-1)?.data.round;
 
   const latestCritique = messages
     .filter((m) => m.data.critique)
@@ -155,15 +237,26 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
     .filter((m) => m.data.score && m.data.score > 0)
     .at(-1)?.data.score;
 
+  const appearedPhases = new Set(messages.map((m) => m.phase));
+  appearedPhases.add(phase);
+
   const didReroll = messages.some((m) => m.phase === "rerolling");
+  const didFix = messages.some((m) => m.phase === "fixing");
 
   const errorMsg = messages.find((m) => m.type === "error")?.data.message;
 
   const imageSnapshots = collectImageSnapshots(messages);
   const codeSnapshots = collectCodeSnapshots(messages);
-
-  // Latest image for prominent display
   const latestImage = imageSnapshots.length > 0 ? imageSnapshots[imageSnapshots.length - 1] : null;
+
+  const phaseTimings = useMemo(() => buildPhaseTimings(messages), [messages]);
+
+  const visiblePhases = phaseOrder.filter((p) => {
+    if (p === "generating" || p === "compiling" || p === "reviewing" || p === "explaining" || p === "done") return true;
+    if (p === "rerolling") return didReroll;
+    if (p === "fixing") return didFix;
+    return false;
+  });
 
   return (
     <div className="rounded-lg border bg-card p-4 space-y-4">
@@ -173,36 +266,30 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
         {/* Left: phase timeline + issues */}
         <div className="space-y-3">
           <div className="space-y-2">
-            {phaseOrder
-              .filter((p) => p !== "fixing") // fixing is shown inline with reviewing
-              .filter((p) => p !== "rerolling" || didReroll) // only show rerolling if it happened
-              .map((p) => (
-                <div key={p} className="flex items-center gap-2 text-sm">
-                  <PhaseIcon phase={p} currentPhase={phase} />
-                  <span
-                    className={
-                      phase === p && p !== "done"
-                        ? "font-medium text-foreground"
-                        : "text-muted-foreground"
-                    }
-                  >
-                    {phaseLabels[p]}
-                  </span>
-                  {p === "reviewing" && latestRound && latestRound > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      (第 {latestRound} 轮)
+            {visiblePhases.map((p) => {
+              const phaseScore = getPhaseScore(messages, p);
+              const statusText = getPhaseStatus(messages, p);
+              const isActive = phase === p && p !== "done";
+              const timing = phaseTimings.get(p);
+
+              return (
+                <div key={p} className="space-y-0.5">
+                  <div className="flex items-center gap-2 text-sm">
+                    <PhaseIcon phase={p} currentPhase={phase} appeared={appearedPhases.has(p)} />
+                    <span className={isActive ? "font-medium text-foreground" : "text-muted-foreground"}>
+                      {phaseLabels[p]}
                     </span>
-                  )}
-                  {p === "reviewing" && latestScore != null && latestScore > 0 && (
-                    <ScoreBadge score={latestScore} />
-                  )}
-                  {p === "rerolling" && didReroll && (
-                    <span className="inline-flex items-center rounded-full bg-red-100 border border-red-300 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300 dark:border-red-700">
-                      重画
-                    </span>
+                    {(p === "reviewing" || p === "rerolling" || p === "fixing") && phaseScore != null && phaseScore > 0 && (
+                      <ScoreBadge score={phaseScore} />
+                    )}
+                    <PhaseTimer timing={timing} isActive={isActive} />
+                  </div>
+                  {statusText && isActive && (
+                    <p className="ml-6 text-xs text-muted-foreground">{statusText}</p>
                   )}
                 </div>
-              ))}
+              );
+            })}
           </div>
 
           {errorMsg && (
@@ -240,8 +327,8 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
           )}
         </div>
 
-        {/* Right: current image preview (prominent) */}
-        {latestImage && (
+        {/* Right: current image preview */}
+        {latestImage ? (
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
               <ImageIcon className="h-3.5 w-3.5" />
@@ -262,12 +349,18 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
               </button>
             </div>
           </div>
+        ) : phase !== "done" && phase !== "generating" && (
+          <div className="flex items-center justify-center min-h-[200px] rounded border border-dashed bg-muted/30">
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-sm">图片渲染中，请稍候...</span>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Collapsible sections: version history, code, diffs */}
+      {/* Collapsible sections */}
       <div className="space-y-2">
-        {/* All version images (if more than one) */}
         {imageSnapshots.length > 1 && (
           <details className="rounded border bg-muted/30 text-xs">
             <summary className="cursor-pointer px-2 py-1.5 font-medium flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
@@ -300,7 +393,6 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
           </details>
         )}
 
-        {/* Code */}
         {codeSnapshots.length > 0 && (
           <details className="rounded border bg-muted/30 text-xs">
             <summary className="cursor-pointer px-2 py-1.5 font-medium flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
@@ -315,7 +407,6 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
           </details>
         )}
 
-        {/* Code diffs between rounds */}
         {codeSnapshots.length > 1 && (
           <details className="rounded border bg-muted/30 text-xs">
             <summary className="cursor-pointer px-2 py-1.5 font-medium flex items-center gap-1.5 text-muted-foreground hover:text-foreground">

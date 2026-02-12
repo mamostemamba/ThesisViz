@@ -8,6 +8,8 @@ export interface WSMessage {
     | "rerolling"
     | "explaining"
     | "done";
+  /** Client-side timestamp (ms) set when the message is received. */
+  _ts?: number;
   data: {
     message?: string;
     progress?: number;
@@ -44,6 +46,7 @@ export function connectGeneration(
   ws.onmessage = (event) => {
     try {
       const msg: WSMessage = JSON.parse(event.data);
+      msg._ts = Date.now();
       onMessage(msg);
     } catch {
       // ignore malformed messages

@@ -57,12 +57,13 @@ export function SmartMode({ projectId }: SmartModeProps) {
   const progressRef = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
-  // Cleanup WS on unmount
+  // Reset global generation store & cleanup WS when project changes (component remounts via key)
   useEffect(() => {
+    resetGeneration();
     return () => {
       wsCleanupRef.current?.();
     };
-  }, []);
+  }, [resetGeneration]);
 
   // Auto-scroll to progress when generation starts or new messages arrive
   useEffect(() => {

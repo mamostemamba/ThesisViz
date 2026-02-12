@@ -22,7 +22,9 @@ function ProjectWorkspace() {
       <div className="flex flex-1">
         <Sidebar />
         <main className="flex-1 p-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {/* key={projectId} forces full remount when switching projects,
+              resetting all local component state */}
+          <Tabs key={projectId} value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList>
               <TabsTrigger value="smart">智能分析</TabsTrigger>
               <TabsTrigger value="expert">专家工具箱</TabsTrigger>

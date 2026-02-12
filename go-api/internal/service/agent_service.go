@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	maxCompileRetries = 3
-	maxRerolls        = 3
-	maxFixRounds      = 5
+	maxCompileRetries  = 3
+	maxRerolls         = 3
+	maxFixRounds       = 5
+	minScoreToFixPhase = 4.0 // bestScore >= 此值时跳出重画，进入修复润色
 )
 
 // ProgressMsg is the WebSocket message sent to clients during generation.
@@ -414,17 +415,31 @@ func (s *AgentService) visualReview(
 		}})
 	}
 
-	// --- 3b. Reroll loop ---
-	for reroll := 1; reroll <= maxRerolls; reroll++ {
-		select {
-		case <-ctx.Done():
-			s.logger.Warn("context cancelled during reroll", zap.Error(ctx.Err()))
-			result.Code = bestCode
-			result.ImageURL = bestImageURL
-			result.ImageKey = bestImageKey
-			return result
-		default:
-		}
+	// --- 3b. Reroll loop (skip entirely if score already sufficient) ---
+	if bestScore >= minScoreToFixPhase {
+		s.logger.Info("score sufficient, skipping reroll phase",
+			zap.Float64("best_score", bestScore),
+		)
+	} else {
+		for reroll := 1; reroll <= maxRerolls; reroll++ {
+			select {
+			case <-ctx.Done():
+				s.logger.Warn("context cancelled during reroll", zap.Error(ctx.Err()))
+				result.Code = bestCode
+				result.ImageURL = bestImageURL
+				result.ImageKey = bestImageKey
+				return result
+			default:
+			}
+
+			// Check again after each reroll in case bestScore improved enough
+			if bestScore >= minScoreToFixPhase {
+				s.logger.Info("best score now sufficient, stopping rerolls",
+					zap.Float64("best_score", bestScore),
+					zap.Int("rerolls_done", reroll-1),
+				)
+				break
+			}
 
 		negativeHint := fmt.Sprintf(
 			"\n\nIMPORTANT: A previous attempt scored %.0f/10 due to: %s. "+
@@ -490,6 +505,7 @@ func (s *AgentService) visualReview(
 		s.logger.Info("reroll review result",
 			zap.Int("reroll", reroll),
 			zap.Float64("score", rev.Score),
+			zap.Float64("best_score", bestScore),
 			zap.Bool("passed", rev.Passed),
 		)
 
@@ -513,7 +529,8 @@ func (s *AgentService) visualReview(
 			ImageURL: rURL, Code: newCode,
 			Critique: rev.Critique, Issues: rev.Issues, Score: rev.Score,
 		}})
-	}
+		}
+	} // end else (reroll loop)
 
 	// --- 3c. Switch to best version for fix phase ---
 	code = bestCode
