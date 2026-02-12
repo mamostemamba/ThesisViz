@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import type { WSMessage } from "@/lib/ws";
 import { DiffViewer } from "./DiffViewer";
-import { CheckCircle2, Circle, Loader2, AlertCircle, XCircle, Code2, Image as ImageIcon, GitCompareArrows, ZoomIn, MessageSquareText } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, AlertCircle, XCircle, Code2, Image as ImageIcon, GitCompareArrows, ZoomIn, MessageSquareText, Copy, Check } from "lucide-react";
 import { ImageLightbox } from "./ImageLightbox";
 
 interface ProgressStreamProps {
@@ -11,7 +11,7 @@ interface ProgressStreamProps {
   phase: string;
 }
 
-const phaseOrder = ["generating", "compiling", "reviewing", "rerolling", "fixing", "explaining", "done"];
+const phaseOrder = ["generating", "compiling", "reviewing", "rerolling", "fixing", "done"];
 
 const phaseLabels: Record<string, string> = {
   generating: "代码生成",
@@ -19,7 +19,6 @@ const phaseLabels: Record<string, string> = {
   reviewing: "视觉审查",
   rerolling: "重新生成",
   fixing: "润色修复",
-  explaining: "代码说明",
   done: "完成",
 };
 
@@ -206,6 +205,33 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
+// ── Copyable code block ──
+
+function CopyableCode({ code, maxH = "max-h-[200px]" }: { code: string; maxH?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [code]);
+
+  return (
+    <div className="relative group">
+      <pre className={`${maxH} overflow-auto rounded border bg-muted p-2 text-xs`}>
+        <code>{code}</code>
+      </pre>
+      <button
+        onClick={handleCopy}
+        className="absolute top-1.5 right-1.5 rounded bg-background/80 border p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+        title="复制代码"
+      >
+        {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  );
+}
+
 // ── Per-phase helpers ──
 
 function getPhaseStatus(messages: WSMessage[], targetPhase: string): string | undefined {
@@ -237,7 +263,7 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
     .filter((m) => m.data.score && m.data.score > 0)
     .at(-1)?.data.score;
 
-  const appearedPhases = new Set(messages.map((m) => m.phase));
+  const appearedPhases = new Set<string>(messages.map((m) => m.phase));
   appearedPhases.add(phase);
 
   const didReroll = messages.some((m) => m.phase === "rerolling");
@@ -252,7 +278,7 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
   const phaseTimings = useMemo(() => buildPhaseTimings(messages), [messages]);
 
   const visiblePhases = phaseOrder.filter((p) => {
-    if (p === "generating" || p === "compiling" || p === "reviewing" || p === "explaining" || p === "done") return true;
+    if (p === "generating" || p === "compiling" || p === "reviewing" || p === "done") return true;
     if (p === "rerolling") return didReroll;
     if (p === "fixing") return didFix;
     return false;
@@ -399,10 +425,8 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
               <Code2 className="h-3.5 w-3.5" />
               生成的代码 ({codeSnapshots.length} 版)
             </summary>
-            <div className="border-t">
-              <pre className="px-2 py-1.5 overflow-x-auto max-h-[200px] overflow-y-auto">
-                <code>{codeSnapshots[codeSnapshots.length - 1].code}</code>
-              </pre>
+            <div className="border-t p-2">
+              <CopyableCode code={codeSnapshots[codeSnapshots.length - 1].code} />
             </div>
           </details>
         )}

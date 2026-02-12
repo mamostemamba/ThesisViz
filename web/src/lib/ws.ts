@@ -6,7 +6,6 @@ export interface WSMessage {
     | "reviewing"
     | "fixing"
     | "rerolling"
-    | "explaining"
     | "done";
   /** Client-side timestamp (ms) set when the message is received. */
   _ts?: number;

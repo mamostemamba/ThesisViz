@@ -196,23 +196,12 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 	imageURL = rr.ImageURL
 	imageKey = rr.ImageKey
 
-	// === Phase 4: Code explanation ===
-	pushFn(ProgressMsg{Type: "status", Phase: "explaining", Data: ProgressData{
-		Message: "Generating explanation...", Progress: 85,
-	}})
-
-	explanationSys := prompt.Explanation(req.Format, req.Language)
-	explanation, _ := s.llm.Generate(ctx, explanationSys, code, 0.4, req.Model)
-
-	// === Phase 5: Save result ===
+	// === Phase 4: Save result ===
 	codePtr := &code
 	gen.Code = codePtr
 	gen.Status = "success"
 	if imageKey != "" {
 		gen.ImageKey = &imageKey
-	}
-	if explanation != "" {
-		gen.Explanation = &explanation
 	}
 	if rr.ReviewRounds > 0 {
 		issuesJSON, _ := json.Marshal(map[string]interface{}{
@@ -228,7 +217,6 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 		GenerationID: gen.ID.String(),
 		Code:         code,
 		Format:       req.Format,
-		Explanation:  explanation,
 		ImageURL:     imageURL,
 		ReviewPassed: rr.ReviewPassed,
 		ReviewRounds: rr.ReviewRounds,
@@ -240,7 +228,6 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 		GenerationID: gen.ID.String(),
 		Code:         code,
 		Format:       req.Format,
-		Explanation:  explanation,
 		ImageURL:     imageURL,
 		ReviewPassed: rr.ReviewPassed,
 		ReviewRounds: rr.ReviewRounds,
@@ -295,8 +282,8 @@ func (s *AgentService) compileWithRetries(
 				return code, "", "", nil, fmt.Errorf("compilation failed: %s", errMsg)
 			}
 
-			pushFn(ProgressMsg{Type: "status", Phase: "fixing", Data: ProgressData{
-				Message:  fmt.Sprintf("Compile error (attempt %d/%d), fixing...", attempt, maxCompileRetries),
+			pushFn(ProgressMsg{Type: "status", Phase: "compiling", Data: ProgressData{
+				Message:  fmt.Sprintf("编译出错（第 %d/%d 次），AI 正在修复代码...", attempt, maxCompileRetries),
 				Progress: 30 + attempt*5,
 				Round:    attempt,
 			}})
@@ -307,6 +294,12 @@ func (s *AgentService) compileWithRetries(
 				continue
 			}
 			code = refined
+
+			pushFn(ProgressMsg{Type: "status", Phase: "compiling", Data: ProgressData{
+				Message:  fmt.Sprintf("代码已修复，正在重新编译（第 %d 次）...", attempt+1),
+				Progress: 30 + attempt*5 + 3,
+				Round:    attempt,
+			}})
 			continue
 		}
 

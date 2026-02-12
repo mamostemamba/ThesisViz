@@ -67,7 +67,8 @@ TEMPLATE (architecture / layered diagram):
   |[fill=tertiaryFill, draw=tertiaryLine]| Queue \\
 };
 
-%% Step 2: Layer background boxes on background layer
+%% Step 2: Layer background boxes MUST go on the background layer
+%% The 'background' layer is already declared in the preamble via \pgfdeclarelayer{background}
 \begin{pgfonlayer}{background}
   \node[layer_box=primaryLine, fit=(m-1-1)(m-1-3), label=above left:{\sffamily\bfseries Layer 1}] {};
   \node[layer_box=secondaryLine, fit=(m-2-1)(m-2-2), label=above left:{\sffamily\bfseries Layer 2}] {};
@@ -92,6 +93,7 @@ MATRIX RULES (non-negotiable):
 - If you need more space: increase row sep (up to 2.5cm) or column sep (up to 3cm).
 - If labels are long: use text width=4cm or 5cm on individual nodes.
 - For many columns (>4): reduce text width to 2.5cm and column sep to 1.5cm.
+- For long text labels, force manual line breaks with \\. Example: |[fill=primaryFill, draw=primaryLine]| Distributed \\ Ledger \\ Technology. Do NOT rely on automatic wrapping alone — it causes unpredictable column widths.
 
 TEMPLATE (simple flowchart — linear chain, ≤5 nodes):
 \begin{tikzpicture}[
@@ -112,8 +114,9 @@ For >5 nodes in a flow, use matrix instead of chain.
   \draw[nice_arrow] (m-1-1) -- (m-2-1);          %% adjacent rows: straight vertical OK
   \draw[nice_arrow] (m-1-3.south) |- (m-3-1.east); %% cross-layer: use |- or -|
   \draw[nice_arrow] (m-2-1) -| (m-3-3);           %% Manhattan path
-- To route AROUND other nodes, use intermediate coordinates:
-  \draw[nice_arrow] (m-1-1.east) -- ++(0.5,0) |- (m-3-3.north);
+- To route AROUND obstacles, use calc library syntax for intermediate dogleg points:
+  \draw[nice_arrow] (m-1-1.east) -- ($(m-1-1.east)!0.5!(m-3-3.north)$) |- (m-3-3.north);
+  Or use offset coordinates: \draw[nice_arrow] (A.east) -- ++(0.5,0) |- (B.north);
 - For bidirectional: use nice_biarrow style.
 
 === PRE-DEFINED STYLES (in preamble — USE THEM, do NOT redefine) ===
@@ -122,7 +125,7 @@ For >5 nodes in a flow, use matrix instead of chain.
 - nice_arrow: All connections. Usage: \draw[nice_arrow] (A) -- (B);
 - nice_biarrow: Bidirectional. Usage: \draw[nice_biarrow] (A) -- (B);
 - container_box: Dashed grouping box. Usage with fit.
-- layer_box={color}: Solid layer background. Usage: \node[layer_box=primaryLine, fit=...] {};
+- layer_box={color}: Solid layer background. MUST be inside \begin{pgfonlayer}{background}...\end{pgfonlayer}. Usage: \node[layer_box=primaryLine, fit=...] {};
 - visible_brace: Thick curly brace for grouping. Usage: \draw[visible_brace] (A.north) -- (B.south) node[midway, right=16pt] {label};
 - visible_brace_mirror: Same but mirrored (opens left). Usage: \draw[visible_brace_mirror] (A.north) -- (B.south);
 NOTE: When drawing curly braces or decorative lines, ALWAYS use visible_brace/visible_brace_mirror. Do NOT use raw \draw[decorate, decoration={brace}] with default thin lines — they become invisible at low resolution.

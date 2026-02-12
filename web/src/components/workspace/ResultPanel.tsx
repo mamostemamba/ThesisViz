@@ -30,7 +30,7 @@ export interface ImageSnapshot {
 interface ResultPanelProps {
   code: string;
   format: string;
-  explanation: string;
+  explanation?: string;
   imageUrl: string;
   reviewPassed: boolean;
   reviewRounds: number;
@@ -45,7 +45,6 @@ interface ResultPanelProps {
 export function ResultPanel({
   code,
   format,
-  explanation,
   imageUrl,
   reviewPassed,
   reviewRounds,
@@ -245,15 +244,6 @@ export function ResultPanel({
 
           {/* Export buttons */}
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopyCode}>
-              {copied === "code" ? (
-                <Check className="mr-1 h-3 w-3" />
-              ) : (
-                <Copy className="mr-1 h-3 w-3" />
-              )}
-              {copied === "code" ? "已复制！" : "复制代码"}
-            </Button>
-
             {format === "tikz" && (
               <Button
                 variant="outline"
@@ -305,20 +295,23 @@ export function ResultPanel({
             <div className="flex items-center justify-between">
               <TabsList>
                 <TabsTrigger value="code">代码</TabsTrigger>
-                <TabsTrigger value="explanation">说明</TabsTrigger>
                 {parentCode && (
                   <TabsTrigger value="diff">差异对比</TabsTrigger>
                 )}
               </TabsList>
             </div>
             <TabsContent value="code" className="mt-2">
-              <pre className="max-h-[350px] overflow-auto rounded border bg-muted p-3 text-xs">
-                <code>{code}</code>
-              </pre>
-            </TabsContent>
-            <TabsContent value="explanation" className="mt-2">
-              <div className="max-h-[350px] overflow-auto rounded border p-3 text-sm prose prose-sm dark:prose-invert">
-                {explanation || "暂无说明"}
+              <div className="relative group">
+                <pre className="max-h-[350px] overflow-auto rounded border bg-muted p-3 text-xs">
+                  <code>{code}</code>
+                </pre>
+                <button
+                  onClick={handleCopyCode}
+                  className="absolute top-2 right-2 rounded bg-background/80 border p-1.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                  title="复制代码"
+                >
+                  {copied === "code" ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
               </div>
             </TabsContent>
             {parentCode && (
