@@ -17,7 +17,7 @@ export function ProjectGallery() {
   const [showInput, setShowInput] = useState(false);
 
   const handleCreate = async () => {
-    const title = newTitle.trim() || "Untitled Project";
+    const title = newTitle.trim() || "未命名项目";
     const project = await createMutation.mutateAsync({ title });
     setNewTitle("");
     setShowInput(false);
@@ -34,15 +34,15 @@ export function ProjectGallery() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Projects</h2>
+          <h2 className="text-2xl font-bold tracking-tight">项目列表</h2>
           <p className="text-sm text-muted-foreground">
-            Create and manage your figure generation projects
+            创建和管理你的学术图表生成项目
           </p>
         </div>
         {!showInput && (
           <Button onClick={() => setShowInput(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            New Project
+            新建项目
           </Button>
         )}
       </div>
@@ -50,7 +50,7 @@ export function ProjectGallery() {
       {showInput && (
         <div className="flex gap-2">
           <Input
-            placeholder="Project title..."
+            placeholder="输入项目标题..."
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => {
@@ -66,10 +66,10 @@ export function ProjectGallery() {
             {createMutation.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : null}
-            Create
+            创建
           </Button>
           <Button variant="outline" onClick={() => setShowInput(false)}>
-            Cancel
+            取消
           </Button>
         </div>
       )}
@@ -81,7 +81,7 @@ export function ProjectGallery() {
       ) : projects.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16">
           <p className="text-sm text-muted-foreground">
-            No projects yet. Create one to get started.
+            暂无项目，创建一个开始使用吧
           </p>
           <Button
             className="mt-4"
@@ -89,7 +89,7 @@ export function ProjectGallery() {
             onClick={() => setShowInput(true)}
           >
             <Plus className="mr-2 h-4 w-4" />
-            Create First Project
+            创建第一个项目
           </Button>
         </div>
       ) : (

@@ -182,7 +182,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
       {/* AI Generate bar */}
       <div className="flex gap-2">
         <Input
-          placeholder="Describe what to generate... e.g. 'A 3-layer neural network diagram'"
+          placeholder="描述你想生成的图表，例如「三层神经网络架构图」"
           value={aiPrompt}
           onChange={(e) => setAiPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -202,7 +202,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
           ) : (
             <Sparkles className="mr-2 h-4 w-4" />
           )}
-          {aiGenerating ? "Generating..." : "AI Generate"}
+          {aiGenerating ? "生成中..." : "AI 生成"}
         </Button>
       </div>
 
@@ -232,7 +232,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
               disabled={isRendering || !code.trim()}
             >
               <Play className="mr-2 h-4 w-4" />
-              {isRendering ? "Rendering..." : "Render"}
+              {isRendering ? "渲染中..." : "渲染"}
             </Button>
             {format === "tikz" && (
               <Button
@@ -245,7 +245,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
                 ) : (
                   <Copy className="mr-2 h-4 w-4" />
                 )}
-                {copied ? "Copied!" : "Copy for Overleaf"}
+                {copied ? "已复制！" : "复制到 Overleaf"}
               </Button>
             )}
             {format === "mermaid" && code.trim() && (
@@ -305,7 +305,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
 
         {/* Right: Preview */}
         <div className="flex w-1/2 flex-col gap-2">
-          <label className="text-sm font-medium">Preview</label>
+          <label className="text-sm font-medium">预览</label>
           <div className="mermaid-preview min-h-0 flex-1 overflow-auto">
             <ImagePreview />
           </div>
@@ -316,7 +316,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
               rel="noopener noreferrer"
               className="text-center text-xs text-muted-foreground hover:underline"
             >
-              Open full image in new tab
+              在新标签页打开完整图片
             </a>
           )}
         </div>

@@ -56,7 +56,7 @@ export function HistoryPanel({ projectId }: HistoryPanelProps) {
   if (!projectId) {
     return (
       <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-        Save your project to see generation history
+        保存项目后可查看生成历史
       </div>
     );
   }
@@ -72,7 +72,7 @@ export function HistoryPanel({ projectId }: HistoryPanelProps) {
   if (generations.length === 0) {
     return (
       <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-        No generations yet. Use Smart Analysis or Expert Toolbox to create figures.
+        暂无生成记录。使用智能分析或专家工具箱来创建图表。
       </div>
     );
   }
@@ -81,7 +81,7 @@ export function HistoryPanel({ projectId }: HistoryPanelProps) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">
-          Generation History ({generations.length})
+          生成历史（{generations.length}）
         </h3>
         {loadingDetail && (
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />

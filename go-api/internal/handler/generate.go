@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -85,13 +86,15 @@ func (h *GenerateHandler) Create(c *gin.Context) {
 
 	taskID := uuid.New().String()
 
-	// Launch pipeline in background goroutine
+	// Copy request data for background goroutine — c.Request.Context() is
+	// canceled once the HTTP response is sent, so we use a detached context.
 	go func() {
+		ctx := context.Background()
 		pushFn := func(msg service.ProgressMsg) {
 			_ = h.hub.Send(taskID, msg)
 		}
 
-		_, err := h.agentSvc.Generate(c.Request.Context(), service.GenerateRequest{
+		_, err := h.agentSvc.Generate(ctx, service.GenerateRequest{
 			ProjectID:      req.ProjectID,
 			Format:         req.Format,
 			Prompt:         req.Prompt,
@@ -140,11 +143,12 @@ func (h *GenerateHandler) Refine(c *gin.Context) {
 	taskID := uuid.New().String()
 
 	go func() {
+		ctx := context.Background()
 		pushFn := func(msg service.ProgressMsg) {
 			_ = h.hub.Send(taskID, msg)
 		}
 
-		_, err := h.agentSvc.Refine(c.Request.Context(), service.RefineRequest{
+		_, err := h.agentSvc.Refine(ctx, service.RefineRequest{
 			GenerationID: req.GenerationID,
 			Modification: req.Modification,
 			Language:     req.Language,

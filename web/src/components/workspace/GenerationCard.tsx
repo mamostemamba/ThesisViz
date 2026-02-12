@@ -21,6 +21,13 @@ export function GenerationCard({
     mermaid: "Mermaid",
   }[generation.format] || generation.format;
 
+  const statusLabels: Record<string, string> = {
+    success: "成功",
+    failed: "失败",
+    processing: "处理中",
+    queued: "排队中",
+  };
+
   const statusColor = {
     success: "text-green-600",
     failed: "text-red-600",
@@ -48,7 +55,7 @@ export function GenerationCard({
             {formatLabel}
           </Badge>
           <span className={`text-xs ${statusColor}`}>
-            {generation.status}
+            {statusLabels[generation.status] || generation.status}
           </span>
         </div>
         <p className="text-xs text-muted-foreground line-clamp-2">

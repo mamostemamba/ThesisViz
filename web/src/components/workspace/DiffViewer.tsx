@@ -13,8 +13,8 @@ interface DiffViewerProps {
 export function DiffViewer({
   oldCode,
   newCode,
-  oldLabel = "Before",
-  newLabel = "After",
+  oldLabel = "修改前",
+  newLabel = "修改后",
 }: DiffViewerProps) {
   const lines = useMemo(() => {
     const patch = createTwoFilesPatch(oldLabel, newLabel, oldCode, newCode, "", "", {
@@ -28,7 +28,7 @@ export function DiffViewer({
   if (oldCode === newCode) {
     return (
       <div className="flex items-center justify-center rounded border border-dashed py-8 text-sm text-muted-foreground">
-        No changes
+        无变更
       </div>
     );
   }

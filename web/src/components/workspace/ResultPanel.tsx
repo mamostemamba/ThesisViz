@@ -128,13 +128,13 @@ export function ResultPanel({
         {/* Left: Image preview */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Result</h3>
+            <h3 className="text-sm font-semibold">结果</h3>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {reviewPassed ? (
-                <span className="text-green-600">Review passed</span>
+                <span className="text-green-600">审查通过</span>
               ) : (
                 <span className="text-yellow-600">
-                  Review: {reviewRounds} round(s)
+                  审查：{reviewRounds} 轮
                 </span>
               )}
             </div>
@@ -159,7 +159,7 @@ export function ResultPanel({
             </a>
           ) : (
             <div className="flex h-[300px] items-center justify-center rounded border border-dashed text-sm text-muted-foreground">
-              No image available
+              暂无图片
             </div>
           )}
 
@@ -171,7 +171,7 @@ export function ResultPanel({
               ) : (
                 <Copy className="mr-1 h-3 w-3" />
               )}
-              {copied === "code" ? "Copied!" : "Copy Code"}
+              {copied === "code" ? "已复制！" : "复制代码"}
             </Button>
 
             {format === "tikz" && (
@@ -185,14 +185,14 @@ export function ResultPanel({
                 ) : (
                   <FileCode className="mr-1 h-3 w-3" />
                 )}
-                {copied === "overleaf" ? "Copied!" : "Copy for Overleaf"}
+                {copied === "overleaf" ? "已复制！" : "复制到 Overleaf"}
               </Button>
             )}
 
             {(imageUrl || format === "mermaid") && (
               <Button variant="outline" size="sm" onClick={handleDownloadPNG}>
                 <Download className="mr-1 h-3 w-3" />
-                Download PNG
+                下载 PNG
               </Button>
             )}
 
@@ -204,7 +204,7 @@ export function ResultPanel({
                   onClick={handleDownloadSVG}
                 >
                   <Download className="mr-1 h-3 w-3" />
-                  Download SVG
+                  下载 SVG
                 </Button>
                 <Button
                   variant="outline"
@@ -224,10 +224,10 @@ export function ResultPanel({
           <Tabs defaultValue="code">
             <div className="flex items-center justify-between">
               <TabsList>
-                <TabsTrigger value="code">Code</TabsTrigger>
-                <TabsTrigger value="explanation">Explanation</TabsTrigger>
+                <TabsTrigger value="code">代码</TabsTrigger>
+                <TabsTrigger value="explanation">说明</TabsTrigger>
                 {parentCode && (
-                  <TabsTrigger value="diff">Diff</TabsTrigger>
+                  <TabsTrigger value="diff">差异对比</TabsTrigger>
                 )}
               </TabsList>
             </div>
@@ -238,7 +238,7 @@ export function ResultPanel({
             </TabsContent>
             <TabsContent value="explanation" className="mt-2">
               <div className="max-h-[350px] overflow-auto rounded border p-3 text-sm prose prose-sm dark:prose-invert">
-                {explanation || "No explanation available."}
+                {explanation || "暂无说明"}
               </div>
             </TabsContent>
             {parentCode && (
@@ -253,7 +253,7 @@ export function ResultPanel({
       {/* Bottom: Refine input */}
       <div className="flex gap-2">
         <Textarea
-          placeholder="Describe modifications... e.g. 'Make the title bigger' or 'Add a legend'"
+          placeholder="描述修改内容，例如「把标题放大」或「添加图例」"
           value={modification}
           onChange={(e) => setModification(e.target.value)}
           className="min-h-[60px] flex-1 resize-none"
@@ -267,7 +267,7 @@ export function ResultPanel({
           <RefreshCw
             className={`mr-2 h-4 w-4 ${isRefining ? "animate-spin" : ""}`}
           />
-          {isRefining ? "Refining..." : "Refine"}
+          {isRefining ? "优化中..." : "优化"}
         </Button>
       </div>
     </div>

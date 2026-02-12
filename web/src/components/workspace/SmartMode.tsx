@@ -172,18 +172,18 @@ export function SmartMode({ projectId }: SmartModeProps) {
       <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Describe Your Thesis</CardTitle>
+            <CardTitle className="text-base">描述你的论文</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <input
               type="text"
-              placeholder="Thesis title (optional)"
+              placeholder="论文标题（可选）"
               value={thesisTitle}
               onChange={(e) => setThesisTitle(e.target.value)}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
             <Textarea
-              placeholder="Paste your thesis abstract or describe the figure you need..."
+              placeholder="粘贴论文摘要或描述你需要的图表..."
               className="min-h-[150px]"
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -198,7 +198,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
               ) : (
                 <Search className="mr-2 h-4 w-4" />
               )}
-              {analyzeMutation.isPending ? "Analyzing..." : "Analyze"}
+              {analyzeMutation.isPending ? "分析中..." : "分析"}
             </Button>
           </CardContent>
         </Card>
@@ -206,7 +206,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
         {/* Recommendations */}
         {recommendations.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold">Recommendations</h3>
+            <h3 className="text-sm font-semibold">推荐图表</h3>
             {recommendations.map((rec, i) => (
               <Card
                 key={i}
@@ -240,7 +240,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
               ) : (
                 <Sparkles className="mr-2 h-4 w-4" />
               )}
-              {isGenerating ? "Generating..." : "Generate Selected"}
+              {isGenerating ? "生成中..." : "生成所选图表"}
             </Button>
           </div>
         )}

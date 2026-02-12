@@ -23,9 +23,9 @@ function ProjectWorkspace() {
         <main className="flex-1 p-6">
           <Tabs defaultValue="smart" className="w-full">
             <TabsList>
-              <TabsTrigger value="smart">Smart Analysis</TabsTrigger>
-              <TabsTrigger value="expert">Expert Toolbox</TabsTrigger>
-              <TabsTrigger value="history">History</TabsTrigger>
+              <TabsTrigger value="smart">智能分析</TabsTrigger>
+              <TabsTrigger value="expert">专家工具箱</TabsTrigger>
+              <TabsTrigger value="history">历史记录</TabsTrigger>
             </TabsList>
 
             <TabsContent value="smart" className="mt-6">

@@ -18,7 +18,7 @@ export function ImagePreview() {
       <div className="flex h-full min-h-[400px] items-center justify-center rounded-md border border-dashed">
         <div className="flex flex-col items-center gap-2 text-muted-foreground">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          <span className="text-sm">Rendering...</span>
+          <span className="text-sm">渲染中...</span>
         </div>
       </div>
     );
@@ -28,7 +28,7 @@ export function ImagePreview() {
     return (
       <div className="flex h-full min-h-[400px] items-center justify-center rounded-md border border-destructive/50 bg-destructive/5 p-4">
         <div className="max-w-full space-y-2 text-center">
-          <p className="text-sm font-medium text-destructive">Render Error</p>
+          <p className="text-sm font-medium text-destructive">渲染错误</p>
           <p className="whitespace-pre-wrap break-words text-xs text-muted-foreground">
             {renderError}
           </p>
@@ -59,7 +59,7 @@ export function ImagePreview() {
     <div className="flex h-full min-h-[400px] items-center justify-center rounded-md border border-dashed">
       <div className="flex flex-col items-center gap-2 text-muted-foreground">
         <ImageIcon className="h-10 w-10" />
-        <span className="text-sm">Rendered image will appear here</span>
+        <span className="text-sm">渲染结果将显示在此处</span>
       </div>
     </div>
   );

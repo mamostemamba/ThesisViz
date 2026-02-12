@@ -11,12 +11,12 @@ interface ProgressStreamProps {
 const phaseOrder = ["generating", "compiling", "reviewing", "fixing", "explaining", "done"];
 
 const phaseLabels: Record<string, string> = {
-  generating: "Code Generation",
-  compiling: "Compilation",
-  reviewing: "Visual Review",
-  fixing: "Fixing Issues",
-  explaining: "Code Explanation",
-  done: "Complete",
+  generating: "代码生成",
+  compiling: "编译渲染",
+  reviewing: "视觉审查",
+  fixing: "修复问题",
+  explaining: "代码说明",
+  done: "完成",
 };
 
 function PhaseIcon({ phase, currentPhase }: { phase: string; currentPhase: string }) {
@@ -45,7 +45,7 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
 
   return (
     <div className="rounded-lg border bg-card p-4 space-y-3">
-      <h3 className="text-sm font-semibold">Generation Progress</h3>
+      <h3 className="text-sm font-semibold">生成进度</h3>
 
       <div className="space-y-2">
         {phaseOrder
@@ -70,7 +70,7 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
         <div className="rounded border border-yellow-200 bg-yellow-50 p-2 text-xs dark:border-yellow-800 dark:bg-yellow-950">
           <div className="flex items-center gap-1 font-medium text-yellow-700 dark:text-yellow-300 mb-1">
             <AlertCircle className="h-3 w-3" />
-            Issues Found
+            发现问题
           </div>
           <ul className="list-disc list-inside space-y-0.5 text-yellow-600 dark:text-yellow-400">
             {latestIssues.map((issue, i) => (
@@ -82,7 +82,7 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
 
       {latestPreviewUrl && (
         <div className="mt-2">
-          <p className="text-xs text-muted-foreground mb-1">Current preview:</p>
+          <p className="text-xs text-muted-foreground mb-1">当前预览：</p>
           <img
             src={latestPreviewUrl}
             alt="Preview"
@@ -95,7 +95,7 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
         <div className="rounded border border-red-200 bg-red-50 p-2 text-xs dark:border-red-800 dark:bg-red-950">
           <div className="flex items-center gap-1 font-medium text-red-700 dark:text-red-300">
             <XCircle className="h-3 w-3" />
-            Error: {errorMsg}
+            错误：{errorMsg}
           </div>
         </div>
       )}

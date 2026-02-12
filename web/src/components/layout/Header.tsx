@@ -22,7 +22,7 @@ export function Header({ projectTitle }: HeaderProps) {
         )}
         <nav className="ml-auto flex gap-4 text-sm text-muted-foreground">
           <Link href="/" className="hover:text-foreground">
-            Projects
+            项目列表
           </Link>
         </nav>
       </div>

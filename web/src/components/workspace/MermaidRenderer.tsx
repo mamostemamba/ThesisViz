@@ -37,7 +37,7 @@ export function MermaidRenderer({ code, colorScheme }: MermaidRendererProps) {
       } catch (err) {
         if (!cancelled) {
           setError(
-            err instanceof Error ? err.message : "Failed to render Mermaid diagram"
+            err instanceof Error ? err.message : "Mermaid 图表渲染失败"
           );
           if (containerRef.current) {
             containerRef.current.innerHTML = "";
@@ -56,7 +56,7 @@ export function MermaidRenderer({ code, colorScheme }: MermaidRendererProps) {
       <div className="flex h-full min-h-[400px] items-center justify-center rounded-md border border-destructive/50 bg-destructive/5 p-4">
         <div className="max-w-full space-y-2 text-center">
           <p className="text-sm font-medium text-destructive">
-            Mermaid Render Error
+            Mermaid 渲染错误
           </p>
           <p className="whitespace-pre-wrap break-words text-xs text-muted-foreground">
             {error}

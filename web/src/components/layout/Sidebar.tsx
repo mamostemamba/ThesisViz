@@ -26,7 +26,7 @@ export function Sidebar() {
     <aside className="w-64 border-r bg-muted/30 p-4">
       <div className="space-y-6">
         <div>
-          <label className="mb-2 block text-sm font-medium">Format</label>
+          <label className="mb-2 block text-sm font-medium">输出格式</label>
           <Select
             value={format}
             onValueChange={(v) =>
@@ -45,7 +45,7 @@ export function Sidebar() {
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Language</label>
+          <label className="mb-2 block text-sm font-medium">语言</label>
           <Select
             value={language}
             onValueChange={(v) => setLanguage(v as "en" | "zh")}
@@ -54,21 +54,21 @@ export function Sidebar() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="zh">Chinese</SelectItem>
+              <SelectItem value="en">英文</SelectItem>
+              <SelectItem value="zh">中文</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Color Scheme</label>
+          <label className="mb-2 block text-sm font-medium">配色方案</label>
           <Select value={colorScheme} onValueChange={setColorScheme}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="drawio">Draw.io Classic</SelectItem>
-              <SelectItem value="academic_blue">Academic Blue</SelectItem>
+              <SelectItem value="drawio">Draw.io 经典</SelectItem>
+              <SelectItem value="academic_blue">学术蓝</SelectItem>
               <SelectItem value="nature">Nature</SelectItem>
               <SelectItem value="ieee">IEEE</SelectItem>
             </SelectContent>
@@ -76,7 +76,7 @@ export function Sidebar() {
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">AI Model</label>
+          <label className="mb-2 block text-sm font-medium">AI 模型</label>
           <Select value={model} onValueChange={setModel}>
             <SelectTrigger>
               <SelectValue />
@@ -90,9 +90,9 @@ export function Sidebar() {
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Status</label>
+          <label className="mb-2 block text-sm font-medium">状态</label>
           <Badge variant={isRendering ? "default" : "secondary"}>
-            {isRendering ? "Rendering..." : "Ready"}
+            {isRendering ? "渲染中..." : "就绪"}
           </Badge>
         </div>
       </div>
