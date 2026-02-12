@@ -9,14 +9,17 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
+	"github.com/thesisviz/go-api/internal/agent"
 	"github.com/thesisviz/go-api/internal/config"
 	"github.com/thesisviz/go-api/internal/handler"
+	"github.com/thesisviz/go-api/internal/llm"
 	"github.com/thesisviz/go-api/internal/model"
 	"github.com/thesisviz/go-api/internal/renderer"
 	"github.com/thesisviz/go-api/internal/repo"
 	"github.com/thesisviz/go-api/internal/router"
 	"github.com/thesisviz/go-api/internal/service"
 	"github.com/thesisviz/go-api/internal/storage"
+	"github.com/thesisviz/go-api/internal/ws"
 )
 
 func main() {
@@ -92,6 +95,33 @@ func main() {
 	generationHandler := handler.NewGenerationHandler(generationSvc, store)
 	renderHandler := handler.NewRenderHandler(renderSvc)
 
+	// LLM + Agents (optional — only if GEMINI_API_KEY is set)
+	var generateHandler *handler.GenerateHandler
+	var wsHandler *handler.WSHandler
+
+	if cfg.GeminiAPIKey != "" {
+		geminiClient, err := llm.NewGeminiClient(context.Background(), cfg.GeminiAPIKey, cfg.GeminiModel)
+		if err != nil {
+			logger.Fatal("failed to create gemini client", zap.Error(err))
+		}
+		logger.Info("gemini client ready", zap.String("model", cfg.GeminiModel))
+
+		agents := map[string]agent.Agent{
+			"tikz":       agent.NewTikZAgent(geminiClient),
+			"matplotlib": agent.NewMatplotlibAgent(geminiClient),
+			"mermaid":    agent.NewMermaidAgent(geminiClient),
+		}
+		routerAgent := agent.NewRouterAgent(geminiClient)
+
+		agentSvc := service.NewAgentService(geminiClient, renderSvc, generationSvc, store, agents, routerAgent, logger)
+
+		wsHub := ws.NewHub(logger)
+		generateHandler = handler.NewGenerateHandler(agentSvc, generationSvc, store, wsHub)
+		wsHandler = handler.NewWSHandler(wsHub, logger)
+	} else {
+		logger.Warn("GEMINI_API_KEY not set — AI generation endpoints disabled")
+	}
+
 	// Router
 	r := router.Setup(router.Deps{
 		DB:                db,
@@ -100,6 +130,8 @@ func main() {
 		ProjectHandler:    projectHandler,
 		GenerationHandler: generationHandler,
 		RenderHandler:     renderHandler,
+		GenerateHandler:   generateHandler,
+		WSHandler:         wsHandler,
 	})
 
 	// Start

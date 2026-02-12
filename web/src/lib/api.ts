@@ -7,6 +7,12 @@ import type {
   CreateProjectRequest,
   UpdateProjectRequest,
   CreateGenerationRequest,
+  AnalyzeRequest,
+  AnalyzeResponse,
+  GenerateCreateRequest,
+  GenerateCreateResponse,
+  GenerateRefineRequest,
+  GenerateRefineResponse,
 } from "@/types/api";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -118,4 +124,30 @@ export async function exportTeX(data: {
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+// AI Generate
+export async function analyzeText(data: AnalyzeRequest) {
+  return apiFetch<AnalyzeResponse>("/api/v1/generate/analyze", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function generateCreate(data: GenerateCreateRequest) {
+  return apiFetch<GenerateCreateResponse>("/api/v1/generate/create", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function generateRefine(data: GenerateRefineRequest) {
+  return apiFetch<GenerateRefineResponse>("/api/v1/generate/refine", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getGenerationDetail(id: string) {
+  return apiFetch<Generation>(`/api/v1/generate/${id}`);
 }

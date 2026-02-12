@@ -1,19 +1,22 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { CodeEditor } from "./CodeEditor";
 import { ImagePreview } from "./ImagePreview";
+import { ProgressStream } from "./ProgressStream";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useRender } from "@/lib/queries";
-import { exportTeX } from "@/lib/api";
-import { Play, Copy, Check } from "lucide-react";
-import { useState } from "react";
+import { exportTeX, generateCreate } from "@/lib/api";
+import { connectGeneration, type WSMessage } from "@/lib/ws";
+import { Play, Copy, Check, Sparkles, Loader2 } from "lucide-react";
 
 export function ExpertToolbox() {
   const code = useGenerateStore((s) => s.code);
   const imageUrl = useGenerateStore((s) => s.imageUrl);
+  const setCode = useGenerateStore((s) => s.setCode);
   const setImageUrl = useGenerateStore((s) => s.setImageUrl);
   const setIsRendering = useGenerateStore((s) => s.setIsRendering);
   const setRenderError = useGenerateStore((s) => s.setRenderError);
@@ -26,11 +29,26 @@ export function ExpertToolbox() {
   const renderMutation = useRender();
   const [copied, setCopied] = useState(false);
 
+  // AI Generate state
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiProgress, setAiProgress] = useState<WSMessage[]>([]);
+  const [aiPhase, setAiPhase] = useState("");
+  const [aiError, setAiError] = useState<string | null>(null);
+  const wsCleanupRef = useRef<(() => void) | null>(null);
+
   // Track if we've rendered at least once (to enable auto-render on scheme change)
   const hasRendered = useRef(false);
   const prevScheme = useRef(colorScheme);
 
-  const handleRender = async () => {
+  // Cleanup WS on unmount
+  useEffect(() => {
+    return () => {
+      wsCleanupRef.current?.();
+    };
+  }, []);
+
+  const handleRender = useCallback(async () => {
     if (!code.trim()) return;
 
     setIsRendering(true);
@@ -58,7 +76,8 @@ export function ExpertToolbox() {
     } finally {
       setIsRendering(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, format, language, colorScheme]);
 
   // Auto-render when color scheme changes (only if we've already rendered once)
   useEffect(() => {
@@ -91,55 +110,148 @@ export function ExpertToolbox() {
     }
   };
 
+  const handleAIGenerate = useCallback(async () => {
+    if (!aiPrompt.trim()) return;
+    setAiGenerating(true);
+    setAiProgress([]);
+    setAiPhase("");
+    setAiError(null);
+
+    try {
+      const res = await generateCreate({
+        format,
+        prompt: aiPrompt,
+        language,
+        color_scheme: colorScheme,
+      });
+
+      wsCleanupRef.current?.();
+      wsCleanupRef.current = connectGeneration(
+        res.task_id,
+        (msg: WSMessage) => {
+          setAiProgress((prev) => [...prev, msg]);
+          setAiPhase(msg.phase);
+
+          if (msg.type === "result" && msg.phase === "done") {
+            // Fill code into editor
+            if (msg.data.code) {
+              setCode(msg.data.code);
+            }
+            if (msg.data.image_url) {
+              setImageUrl(msg.data.image_url);
+              hasRendered.current = true;
+            }
+            setAiGenerating(false);
+          }
+
+          if (msg.type === "error") {
+            setAiError(msg.data.message || "Generation failed");
+            setAiGenerating(false);
+          }
+        },
+        () => {
+          setAiGenerating(false);
+        }
+      );
+    } catch (err) {
+      setAiError(
+        err instanceof Error ? err.message : "Failed to start AI generation"
+      );
+      setAiGenerating(false);
+    }
+  }, [aiPrompt, format, language, colorScheme, setCode, setImageUrl]);
+
   return (
-    <div className="flex h-[calc(100vh-10rem)] gap-4">
-      {/* Left: Code editor */}
-      <div className="flex w-1/2 flex-col gap-3">
-        <div className="min-h-0 flex-1">
-          <CodeEditor />
-        </div>
-        <div className="flex gap-2">
-          <Button
-            className="flex-1"
-            onClick={handleRender}
-            disabled={isRendering || !code.trim()}
-          >
-            <Play className="mr-2 h-4 w-4" />
-            {isRendering ? "Rendering..." : "Render"}
-          </Button>
-          {format === "tikz" && (
-            <Button
-              variant="outline"
-              onClick={handleCopyForOverleaf}
-              disabled={!code.trim()}
-            >
-              {copied ? (
-                <Check className="mr-2 h-4 w-4" />
-              ) : (
-                <Copy className="mr-2 h-4 w-4" />
-              )}
-              {copied ? "Copied!" : "Copy for Overleaf"}
-            </Button>
+    <div className="flex h-[calc(100vh-10rem)] flex-col gap-3">
+      {/* AI Generate bar */}
+      <div className="flex gap-2">
+        <Input
+          placeholder="Describe what to generate... e.g. 'A 3-layer neural network diagram'"
+          value={aiPrompt}
+          onChange={(e) => setAiPrompt(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !aiGenerating) {
+              handleAIGenerate();
+            }
+          }}
+          className="flex-1"
+        />
+        <Button
+          onClick={handleAIGenerate}
+          disabled={aiGenerating || !aiPrompt.trim()}
+          variant="secondary"
+        >
+          {aiGenerating ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="mr-2 h-4 w-4" />
           )}
-        </div>
+          {aiGenerating ? "Generating..." : "AI Generate"}
+        </Button>
       </div>
 
-      {/* Right: Preview */}
-      <div className="flex w-1/2 flex-col gap-2">
-        <label className="text-sm font-medium">Preview</label>
-        <div className="min-h-0 flex-1 overflow-auto">
-          <ImagePreview />
+      {/* AI Progress */}
+      {aiGenerating && aiProgress.length > 0 && (
+        <ProgressStream messages={aiProgress} phase={aiPhase} />
+      )}
+
+      {/* AI Error */}
+      {aiError && !aiGenerating && (
+        <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+          {aiError}
         </div>
-        {imageUrl && (
-          <a
-            href={imageUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-center text-xs text-muted-foreground hover:underline"
-          >
-            Open full image in new tab
-          </a>
-        )}
+      )}
+
+      {/* Editor + Preview */}
+      <div className="flex min-h-0 flex-1 gap-4">
+        {/* Left: Code editor */}
+        <div className="flex w-1/2 flex-col gap-3">
+          <div className="min-h-0 flex-1">
+            <CodeEditor />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              onClick={handleRender}
+              disabled={isRendering || !code.trim()}
+            >
+              <Play className="mr-2 h-4 w-4" />
+              {isRendering ? "Rendering..." : "Render"}
+            </Button>
+            {format === "tikz" && (
+              <Button
+                variant="outline"
+                onClick={handleCopyForOverleaf}
+                disabled={!code.trim()}
+              >
+                {copied ? (
+                  <Check className="mr-2 h-4 w-4" />
+                ) : (
+                  <Copy className="mr-2 h-4 w-4" />
+                )}
+                {copied ? "Copied!" : "Copy for Overleaf"}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Preview */}
+        <div className="flex w-1/2 flex-col gap-2">
+          <label className="text-sm font-medium">Preview</label>
+          <div className="min-h-0 flex-1 overflow-auto">
+            <ImagePreview />
+          </div>
+          {imageUrl && (
+            <a
+              href={imageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-center text-xs text-muted-foreground hover:underline"
+            >
+              Open full image in new tab
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );

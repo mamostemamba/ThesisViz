@@ -6,10 +6,16 @@ import {
   deleteProject,
   listGenerations,
   renderCode,
+  analyzeText,
+  generateCreate,
+  generateRefine,
 } from "./api";
 import type {
   CreateProjectRequest,
   RenderRequest,
+  AnalyzeRequest,
+  GenerateCreateRequest,
+  GenerateRefineRequest,
 } from "@/types/api";
 
 // Projects
@@ -61,5 +67,24 @@ export function useGenerations(projectId: string, page = 1, pageSize = 20) {
 export function useRender() {
   return useMutation({
     mutationFn: (data: RenderRequest) => renderCode(data),
+  });
+}
+
+// AI Generate
+export function useAnalyze() {
+  return useMutation({
+    mutationFn: (data: AnalyzeRequest) => analyzeText(data),
+  });
+}
+
+export function useGenerateCreate() {
+  return useMutation({
+    mutationFn: (data: GenerateCreateRequest) => generateCreate(data),
+  });
+}
+
+export function useGenerateRefine() {
+  return useMutation({
+    mutationFn: (data: GenerateRefineRequest) => generateRefine(data),
   });
 }

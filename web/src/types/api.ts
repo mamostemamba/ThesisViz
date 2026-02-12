@@ -65,3 +65,49 @@ export interface CreateGenerationRequest {
   parent_id?: string;
   code?: string;
 }
+
+// AI Generation types
+
+export interface AnalyzeRequest {
+  text: string;
+  language?: string;
+  thesis_title?: string;
+  thesis_abstract?: string;
+}
+
+export interface Recommendation {
+  title: string;
+  description: string;
+  drawing_prompt: string;
+  format?: string;
+  priority: number;
+}
+
+export interface AnalyzeResponse {
+  recommendations: Recommendation[];
+}
+
+export interface GenerateCreateRequest {
+  project_id?: string;
+  format: string;
+  prompt: string;
+  language?: string;
+  color_scheme?: string;
+  thesis_title?: string;
+  thesis_abstract?: string;
+}
+
+export interface GenerateCreateResponse {
+  task_id: string;
+}
+
+export interface GenerateRefineRequest {
+  generation_id: string;
+  modification: string;
+  language?: string;
+  color_scheme?: string;
+}
+
+export interface GenerateRefineResponse {
+  task_id: string;
+}

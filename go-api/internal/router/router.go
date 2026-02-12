@@ -18,6 +18,8 @@ type Deps struct {
 	ProjectHandler    *handler.ProjectHandler
 	GenerationHandler *handler.GenerationHandler
 	RenderHandler     *handler.RenderHandler
+	GenerateHandler   *handler.GenerateHandler
+	WSHandler         *handler.WSHandler
 }
 
 func Setup(deps Deps) *gin.Engine {
@@ -59,6 +61,19 @@ func Setup(deps Deps) *gin.Engine {
 		if deps.RenderHandler != nil {
 			v1.POST("/render", deps.RenderHandler.Render)
 			v1.POST("/export/tex", deps.RenderHandler.ExportTeX)
+		}
+
+		// Generate (AI pipeline)
+		if deps.GenerateHandler != nil {
+			v1.POST("/generate/analyze", deps.GenerateHandler.Analyze)
+			v1.POST("/generate/create", deps.GenerateHandler.Create)
+			v1.POST("/generate/refine", deps.GenerateHandler.Refine)
+			v1.GET("/generate/:id", deps.GenerateHandler.Get)
+		}
+
+		// WebSocket
+		if deps.WSHandler != nil {
+			v1.GET("/ws/generate/:taskId", deps.WSHandler.HandleGenerate)
 		}
 	}
 

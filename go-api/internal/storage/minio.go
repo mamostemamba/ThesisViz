@@ -58,6 +58,20 @@ func (s *MinIOStorage) PresignedURL(ctx context.Context, key string) (string, er
 	return url.String(), nil
 }
 
+func (s *MinIOStorage) Download(ctx context.Context, key string) ([]byte, error) {
+	obj, err := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get object: %w", err)
+	}
+	defer obj.Close()
+
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(obj); err != nil {
+		return nil, fmt.Errorf("read object: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
 func (s *MinIOStorage) Delete(ctx context.Context, key string) error {
 	err := s.client.RemoveObject(ctx, s.bucket, key, minio.RemoveObjectOptions{})
 	if err != nil {

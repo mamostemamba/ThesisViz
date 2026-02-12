@@ -5,20 +5,24 @@ import (
 )
 
 type Config struct {
-	DBUrl        string `mapstructure:"DB_URL"`
-	RedisUrl     string `mapstructure:"REDIS_URL"`
+	DBUrl          string `mapstructure:"DB_URL"`
+	RedisUrl       string `mapstructure:"REDIS_URL"`
 	MinioEndpoint  string `mapstructure:"MINIO_ENDPOINT"`
 	MinioAccessKey string `mapstructure:"MINIO_ACCESS_KEY"`
 	MinioSecretKey string `mapstructure:"MINIO_SECRET_KEY"`
 	MinioBucket    string `mapstructure:"MINIO_BUCKET"`
 	MinioUseSSL    bool   `mapstructure:"MINIO_USE_SSL"`
 	GeminiAPIKey   string `mapstructure:"GEMINI_API_KEY"`
+	GeminiModel    string `mapstructure:"GEMINI_MODEL"`
 	GoAPIPort      string `mapstructure:"GO_API_PORT"`
 	PyRenderURL    string `mapstructure:"PY_RENDER_URL"`
 }
 
 func Load() (*Config, error) {
-	viper.SetConfigFile(".env")
+	viper.SetConfigName(".env")
+	viper.SetConfigType("env")
+	viper.AddConfigPath(".")  // go-api/.env  (when run from go-api/)
+	viper.AddConfigPath("..") // ../.env      (monorepo root)
 	viper.AutomaticEnv()
 
 	// Set defaults
@@ -31,6 +35,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("MINIO_SECRET_KEY", "minioadmin")
 	viper.SetDefault("MINIO_BUCKET", "thesisviz")
 	viper.SetDefault("MINIO_USE_SSL", false)
+	viper.SetDefault("GEMINI_MODEL", "gemini-2.5-flash")
 
 	// .env file is optional; env vars take precedence
 	_ = viper.ReadInConfig()
