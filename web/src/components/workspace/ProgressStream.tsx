@@ -41,6 +41,16 @@ function buildPhaseTimings(messages: WSMessage[]): Map<string, PhaseTiming> {
       map.set(m.phase, { startTs: ts, endTs: undefined });
     }
   }
+
+  // "planning" and "generating" are pushed back-to-back before ag.Generate(),
+  // so fold planning's startTs into generating to measure the real total time.
+  const planning = map.get("planning");
+  const generating = map.get("generating");
+  if (planning && generating) {
+    generating.startTs = planning.startTs;
+    map.delete("planning");
+  }
+
   // Set endTs for each phase = startTs of the next phase that appeared
   const ordered = phaseOrder.filter((p) => map.has(p));
   for (let i = 0; i < ordered.length - 1; i++) {
@@ -52,6 +62,7 @@ function buildPhaseTimings(messages: WSMessage[]): Map<string, PhaseTiming> {
 }
 
 function formatElapsed(ms: number): string {
+  if (ms > 0 && ms < 1000) return "<1s";
   const secs = Math.floor(ms / 1000);
   if (secs < 60) return `${secs}s`;
   const mins = Math.floor(secs / 60);
@@ -312,7 +323,8 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
                     {(p === "reviewing" || p === "rerolling" || p === "fixing") && phaseScore != null && phaseScore > 0 && (
                       <ScoreBadge score={phaseScore} />
                     )}
-                    <PhaseTimer timing={timing} isActive={isActive} />
+                    {/* planning has no separate timing — folded into generating */}
+                    {p !== "planning" && <PhaseTimer timing={timing} isActive={isActive} />}
                   </div>
                   {statusText && isActive && (
                     <p className="ml-6 text-xs text-muted-foreground">{statusText}</p>

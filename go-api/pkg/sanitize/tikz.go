@@ -13,10 +13,16 @@ var (
 	// "raw code leakage" when used inside TikZ matrix cells.
 	textbfRe    = regexp.MustCompile(`\\textbf\{([^}]*)\}`)
 	textitRe    = regexp.MustCompile(`\\textit\{([^}]*)\}`)
+	textrmRe    = regexp.MustCompile(`\\textrm\{([^}]*)\}`)
+	textsfRe    = regexp.MustCompile(`\\textsf\{([^}]*)\}`)
+	textttRe    = regexp.MustCompile(`\\texttt\{([^}]*)\}`)
+	textscRe    = regexp.MustCompile(`\\textsc\{([^}]*)\}`)
 	underlineRe = regexp.MustCompile(`\\underline\{([^}]*)\}`)
 	emphRe      = regexp.MustCompile(`\\emph\{([^}]*)\}`)
 	textRe      = regexp.MustCompile(`\\text\{([^}]*)\}`)
 	mboxRe      = regexp.MustCompile(`\\mbox\{([^}]*)\}`)
+	makeboxRe   = regexp.MustCompile(`\\makebox(?:\[[^\]]*\])?\{([^}]*)\}`)
+	parboxRe    = regexp.MustCompile(`\\parbox(?:\[[^\]]*\])?\{[^}]*\}\{([^}]*)\}`)
 	fontSizeRe  = regexp.MustCompile(`\\(?:footnotesize|scriptsize|tiny|small|large|Large|LARGE|huge|Huge|normalsize)\b\s*`)
 	tabularRe   = regexp.MustCompile(`\\begin\{tabular\}(?:\{[^}]*\})?([\s\S]*?)\\end\{tabular\}`)
 
@@ -86,18 +92,19 @@ func TikZ(code string) string {
 	code = defineColorRe.ReplaceAllString(code, "")
 	code = tikzDefColorRe.ReplaceAllString(code, "")
 
-	// Replace \textbf{...} → {\bfseries ...}
+	// Replace \textXX{...} → brace-grouped equivalents or plain text
 	code = textbfRe.ReplaceAllString(code, `{\bfseries $1}`)
-	// Replace \textit{...} → {\itshape ...}
 	code = textitRe.ReplaceAllString(code, `{\itshape $1}`)
-	// Replace \emph{...} → {\itshape ...}
+	code = textrmRe.ReplaceAllString(code, `$1`)
+	code = textsfRe.ReplaceAllString(code, `{\sffamily $1}`)
+	code = textttRe.ReplaceAllString(code, `{\ttfamily $1}`)
+	code = textscRe.ReplaceAllString(code, `$1`)
 	code = emphRe.ReplaceAllString(code, `{\itshape $1}`)
-	// Replace \underline{...} → plain text (underline rarely needed in diagrams)
 	code = underlineRe.ReplaceAllString(code, `$1`)
-	// Replace \text{...} → plain content
 	code = textRe.ReplaceAllString(code, `$1`)
-	// Replace \mbox{...} → plain content
 	code = mboxRe.ReplaceAllString(code, `$1`)
+	code = makeboxRe.ReplaceAllString(code, `$1`)
+	code = parboxRe.ReplaceAllString(code, `$1`)
 	// Remove font size commands
 	code = fontSizeRe.ReplaceAllString(code, "")
 	// Replace \begin{tabular}...\end{tabular} → extracted plain text
@@ -109,5 +116,6 @@ func TikZ(code string) string {
 		return stripTabularContent(subs[1])
 	})
 
+	code = ensureMatrixOfNodes(code)
 	return code
 }

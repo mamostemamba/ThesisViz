@@ -133,7 +133,7 @@ func (r *TikZRenderer) Render(ctx context.Context, code string, opts RenderOpts)
 		colors = defaultColors
 	}
 
-	cleanCode := sanitize.TikZClean(code)
+	cleanCode := sanitize.TikZ(code)
 	ctexLine := ""
 	if lang == "zh" {
 		ctexLine = `\usepackage{ctex}`
@@ -205,7 +205,7 @@ func (r *TikZRenderer) Render(ctx context.Context, code string, opts RenderOpts)
 
 // BuildFullTeX returns the complete .tex source for a TikZ code snippet.
 func BuildFullTeX(tikzCode, colorDefs, language string) string {
-	cleanCode := sanitize.TikZClean(tikzCode)
+	cleanCode := sanitize.TikZ(tikzCode)
 	ctexLine := ""
 	if strings.EqualFold(language, "zh") {
 		ctexLine = `\usepackage{ctex}`
