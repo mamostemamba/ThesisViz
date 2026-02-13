@@ -31,6 +31,7 @@ type PlanEdge struct {
 	To    string `json:"to"`
 	Label string `json:"label,omitempty"`
 	Style string `json:"style,omitempty"` // "arrow" (default) or "biarrow"
+	Type  string `json:"type,omitempty"`  // "main_flow" (default) or "skip"
 }
 
 // PlanAnnotation is a decorative annotation (brace, etc.).
@@ -214,19 +215,27 @@ func renderPlanEdge(from, to nodePos, label, style string, maxCols int) string {
 
 	switch {
 	case from.Row == to.Row:
-		// Same row → straight horizontal
-		path = fmt.Sprintf("(%s) -- (%s)", fromRef, toRef)
+		// Same row → straight horizontal with explicit anchors
+		if from.Col < to.Col {
+			path = fmt.Sprintf("(%s.east) -- (%s.west)", fromRef, toRef)
+		} else {
+			path = fmt.Sprintf("(%s.west) -- (%s.east)", fromRef, toRef)
+		}
 
 	case from.Col == to.Col:
-		// Same column → straight vertical
-		path = fmt.Sprintf("(%s) -- (%s)", fromRef, toRef)
+		// Same column → straight vertical with explicit anchors
+		if from.Row < to.Row {
+			path = fmt.Sprintf("(%s.south) -- (%s.north)", fromRef, toRef)
+		} else {
+			path = fmt.Sprintf("(%s.north) -- (%s.south)", fromRef, toRef)
+		}
 
 	case rowDiff == 1:
-		// Adjacent rows, different column → simple manhattan L-shape
+		// Adjacent rows, different column → buffer offset + rectangular Manhattan path
 		if from.Row < to.Row {
-			path = fmt.Sprintf("(%s.south) |- (%s)", fromRef, toRef)
+			path = fmt.Sprintf("(%s.south) -- ++(0,-0.6cm) -| (%s.north)", fromRef, toRef)
 		} else {
-			path = fmt.Sprintf("(%s.north) |- (%s)", fromRef, toRef)
+			path = fmt.Sprintf("(%s.north) -- ++(0,0.6cm) -| (%s.south)", fromRef, toRef)
 		}
 
 	default:
@@ -237,21 +246,11 @@ func renderPlanEdge(from, to nodePos, label, style string, maxCols int) string {
 		midCol := float64(maxCols+1) / 2.0
 
 		if avgCol <= midCol {
-			// Route via left side
-			offset := "-1.2cm"
-			if from.Row < to.Row {
-				path = fmt.Sprintf("(%s.west) -- ++(%s,0) |- (%s.west)", fromRef, offset, toRef)
-			} else {
-				path = fmt.Sprintf("(%s.west) -- ++(%s,0) |- (%s.west)", fromRef, offset, toRef)
-			}
+			// Route via left side with buffer offset
+			path = fmt.Sprintf("(%s.west) -- ++(-1.2cm,0) |- (%s.west)", fromRef, toRef)
 		} else {
-			// Route via right side
-			offset := "1.2cm"
-			if from.Row < to.Row {
-				path = fmt.Sprintf("(%s.east) -- ++(%s,0) |- (%s.east)", fromRef, offset, toRef)
-			} else {
-				path = fmt.Sprintf("(%s.east) -- ++(%s,0) |- (%s.east)", fromRef, offset, toRef)
-			}
+			// Route via right side with buffer offset
+			path = fmt.Sprintf("(%s.east) -- ++(1.2cm,0) |- (%s.east)", fromRef, toRef)
 		}
 	}
 

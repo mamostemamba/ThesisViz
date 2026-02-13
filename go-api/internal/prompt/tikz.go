@@ -48,54 +48,77 @@ FORBIDDEN — NEVER DO THESE:
 REQUIRED — ALWAYS USE \matrix FOR ANY DIAGRAM WITH 3+ NODES:
   \matrix guarantees perfect grid alignment. Nodes NEVER overlap.
 
-TEMPLATE (architecture / layered diagram):
-\begin{tikzpicture}[
-  node distance=0.5cm,
-]
+Choose the appropriate template based on diagram complexity:
 
-%% Step 1: ALL nodes go inside ONE matrix — no exceptions
+TEMPLATE A (simple — vertical stack, all rows similar width):
+Use a SINGLE \matrix for the entire diagram.
+
+\begin{tikzpicture}[node distance=0.5cm]
 \matrix (m) [
-  matrix of nodes,
-  row sep=1.5cm,
-  column sep=2cm,
-  nodes={matrix_node},
+  matrix of nodes, row sep=1.5cm, column sep=2cm, nodes={matrix_node},
 ] {
   |[fill=primaryFill, draw=primaryLine]| Module A &
-  |[fill=primaryFill, draw=primaryLine]| Module B &
-  |[fill=primaryFill, draw=primaryLine]| Module C \\
-  %% Row 2
+  |[fill=primaryFill, draw=primaryLine]| Module B \\
   |[fill=secondaryFill, draw=secondaryLine]| Service X &
-  |[fill=secondaryFill, draw=secondaryLine]| Service Y &
-  \\
-  %% Row 3
-  |[fill=tertiaryFill, draw=tertiaryLine]| Database &
-  |[fill=tertiaryFill, draw=tertiaryLine]| Cache &
-  |[fill=tertiaryFill, draw=tertiaryLine]| Queue \\
+  |[fill=secondaryFill, draw=secondaryLine]| Service Y \\
 };
-
-%% Step 2: Layer background boxes MUST go on the background layer
-%% The 'background' layer is already declared in the preamble via \pgfdeclarelayer{background}
 \begin{pgfonlayer}{background}
-  \node[layer_box=primaryLine, fit=(m-1-1)(m-1-3), label=above left:{\sffamily\normalsize\bfseries Layer 1}] {};
+  \node[layer_box=primaryLine, fit=(m-1-1)(m-1-2), label=above left:{\sffamily\normalsize\bfseries Layer 1}] {};
   \node[layer_box=secondaryLine, fit=(m-2-1)(m-2-2), label=above left:{\sffamily\normalsize\bfseries Layer 2}] {};
-  \node[layer_box=tertiaryLine, fit=(m-3-1)(m-3-3), label=above left:{\sffamily\normalsize\bfseries Layer 3}] {};
 \end{pgfonlayer}
-
-%% Step 3: Draw ALL connections LAST — use -| or |- for Manhattan routing
-\draw[nice_arrow] (m-1-1) -- (m-2-1);
-\draw[nice_arrow] (m-1-2) -- (m-2-2);
-\draw[nice_arrow] (m-2-1) -- (m-3-1);
-\draw[nice_arrow] (m-1-3.south) |- ([yshift=-0.4cm]m-1-3.south) -| (m-3-3.north);
-
+\draw[nice_arrow] (m-1-1.south) -- (m-2-1.north);
+\draw[nice_arrow] (m-1-2.south) -- (m-2-2.north);
 \end{tikzpicture}
 
-MATRIX RULES (non-negotiable):
+TEMPLATE B (complex — multiple blocks with different sizes, side-by-side, or mixed layout):
+Use MULTIPLE NAMED \matrix blocks, each positioned relative to another.
+
+\begin{tikzpicture}[node distance=0.5cm]
+
+%% Block 1: Encoder (origin — no positioning)
+\matrix (encoder) [
+  matrix of nodes, row sep=1.2cm, column sep=1.8cm, nodes={matrix_node},
+] {
+  |[fill=primaryFill, draw=primaryLine]| Self-Attention \\
+  |[fill=primaryFill, draw=primaryLine]| Feed Forward \\
+};
+
+%% Block 2: Decoder (right of encoder)
+\matrix (decoder) [
+  matrix of nodes, row sep=1.2cm, column sep=1.8cm, nodes={matrix_node},
+  right=3cm of encoder,
+] {
+  |[fill=secondaryFill, draw=secondaryLine]| Cross-Attention \\
+  |[fill=secondaryFill, draw=secondaryLine]| Feed Forward \\
+};
+
+%% Background boxes — fit=(matrixname) auto-wraps ALL nodes in that matrix
+\begin{pgfonlayer}{background}
+  \node[layer_box=primaryLine, fit=(encoder), label=above left:{\sffamily\normalsize\bfseries Encoder}] {};
+  \node[layer_box=secondaryLine, fit=(decoder), label=above left:{\sffamily\normalsize\bfseries Decoder}] {};
+\end{pgfonlayer}
+
+%% Connections
+\draw[nice_arrow] (encoder-1-1.south) -- (encoder-2-1.north);
+\draw[nice_arrow] (encoder-2-1.east) -- (decoder-1-1.west);
+\draw[nice_arrow] (decoder-1-1.south) -- (decoder-2-1.north);
+\end{tikzpicture}
+
+NAMED MATRIX RULES (for Template B):
+- Each \matrix MUST be named: \matrix (blockname) [...]
+- Reference nodes as (blockname-row-col): (encoder-1-1), (decoder-2-1)
+- Position blocks relative to each other: right=3cm of encoder, below=2.5cm of input
+- fit=(blockname) auto-wraps ALL nodes in that matrix — no dead space
+- The FIRST block has no positioning (it is the origin)
+- Use .east/.west anchors for horizontal cross-block edges
+- Use .south/.north anchors for vertical cross-block edges
+
+GENERAL MATRIX RULES (both templates):
 - Each row = one layer/tier. Rows separated by \\.
 - Each column = one position. Columns separated by &.
 - Empty cells are OK (just leave blank before & or \\).
-- Reference nodes as (m-row-col): (m-1-1) = row 1 col 1.
 - Override individual node styles with |[style]| prefix.
-- NEVER place ANY node outside the matrix. ALL content nodes go IN the matrix.
+- NEVER place ANY node outside a matrix. ALL content nodes go IN a matrix.
 - If you need more space: increase row sep (up to 2.5cm) or column sep (up to 3cm).
 - For many columns (>4): reduce column sep to 1.5cm.
 - For long text labels in \node[...]{...}; syntax, you may use \\ for line breaks.
@@ -142,15 +165,50 @@ TEMPLATE (simple flowchart — linear chain, ≤5 nodes):
 \end{tikzpicture}
 For >5 nodes in a flow, use matrix instead of chain.
 
-=== CONNECTION RULES (critical) ===
-- NEVER draw diagonal straight lines between non-adjacent nodes.
-- ALL cross-layer connections MUST use Manhattan routing:
-  \draw[nice_arrow] (m-1-1) -- (m-2-1);          %% adjacent rows: straight vertical OK
-  \draw[nice_arrow] (m-1-3.south) |- (m-3-1.east); %% cross-layer: use |- or -|
-  \draw[nice_arrow] (m-2-1) -| (m-3-3);           %% Manhattan path
-- To route AROUND obstacles, use calc library syntax for intermediate dogleg points:
-  \draw[nice_arrow] (m-1-1.east) -- ($(m-1-1.east)!0.5!(m-3-3.north)$) |- (m-3-3.north);
-  Or use offset coordinates: \draw[nice_arrow] (A.east) -- ++(0.5,0) |- (B.north);
+=== CONNECTION RULES (critical — lines MUST NOT cross text) ===
+
+MANDATORY ROUTING RULES:
+
+1. ANCHOR SPECIFICITY: Always start/end at .north, .south, .east, or .west.
+   NEVER use the default center anchor.
+   BAD:  \draw[nice_arrow] (m-1-1) -- (m-2-1);
+   GOOD: \draw[nice_arrow] (m-1-1.south) -- (m-2-1.north);
+
+2. NO DIAGONAL CUTS: NEVER use (A) -- (B) for cross-layer connections.
+   Straight lines between misaligned nodes create diagonals that cut through text.
+
+3. BUFFER OFFSETS (Rule A — main flow): Adjacent connections between neighboring
+   blocks MUST use the ++ syntax to move the line AWAY from the node before turning:
+   BAD:  \draw[nice_arrow] (Layer1) -- (Layer2);
+   GOOD: \draw[nice_arrow] (Layer1.east) -- ++(1cm,0) |- (Layer2.east);
+   The ++(1cm,0) moves the line 1cm to the right BEFORE turning up/down.
+
+4. SMOOTH CURVES (Rule B — skip/residual connections): Connections that cross 1+
+   intermediate blocks MUST use smooth curves routed via the west side of the diagram.
+   This is the standard academic convention for residual/skip connections.
+   BAD:  \draw (A.south) -- ++(0,-0.8cm) -| (C.north);  %% ugly Manhattan detour
+   GOOD: \draw[nice_arrow] (A.west) to[out=180, in=180, looseness=1.2] (C.west);
+   With label:
+   GOOD: \draw[nice_arrow] (A.west) to[out=180, in=180, looseness=1.2]
+           node[midway, left, fill=white, font=\sffamily\footnotesize] {Residual} (C.west);
+   Use looseness=1.2 for 1 intermediate block, looseness=1.5 for 2+ intermediate blocks.
+
+5. NO TRIANGLE/PYRAMID LINES: Do NOT draw diagonal lines that form triangles.
+   For main flow: use rectangular paths with -| or |- .
+   For skip connections: use smooth curves (Rule B above).
+
+ALLOWED CONNECTION PATTERNS:
+  %% Adjacent same-column (straight vertical — anchors required):
+  \draw[nice_arrow] (m-1-1.south) -- (m-2-1.north);
+  %% Adjacent same-row (straight horizontal — anchors required):
+  \draw[nice_arrow] (m-1-1.east) -- (m-1-2.west);
+  %% Cross-layer different column (Manhattan with buffer offset):
+  \draw[nice_arrow] (m-1-1.south) -- ++(0,-0.6cm) -| (m-3-2.north);
+  \draw[nice_arrow] (m-1-3.east) -- ++(1cm,0) |- (m-3-1.east);
+  %% Skip/residual (smooth curve via west side):
+  \draw[nice_arrow] (A.west) to[out=180, in=180, looseness=1.2] (C.west);
+  \draw[nice_arrow] (A.west) to[out=180, in=180, looseness=1.5] (D.west);
+
 - For bidirectional: use nice_biarrow style.
 
 === PRE-DEFINED STYLES (in preamble — USE THEM, do NOT redefine) ===

@@ -50,8 +50,8 @@ func TestRenderTikZPlan_SkipConnection(t *testing.T) {
 	}
 	code := RenderTikZPlan(plan)
 
-	// Skip connection (same column, 2 rows apart) should be a straight vertical line
-	if !strings.Contains(code, "(m-1-1) -- (m-3-1)") {
-		t.Error("expected straight vertical for same-column skip connection")
+	// Skip connection (same column, 2 rows apart) should use explicit anchors
+	if !strings.Contains(code, "(m-1-1.south) -- (m-3-1.north)") {
+		t.Error("expected anchored vertical for same-column skip connection")
 	}
 }
