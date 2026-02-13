@@ -11,9 +11,10 @@ interface ProgressStreamProps {
   phase: string;
 }
 
-const phaseOrder = ["generating", "compiling", "reviewing", "rerolling", "fixing", "done"];
+const phaseOrder = ["planning", "generating", "compiling", "reviewing", "rerolling", "fixing", "done"];
 
 const phaseLabels: Record<string, string> = {
+  planning: "布局规划",
   generating: "代码生成",
   compiling: "编译渲染",
   reviewing: "视觉审查",
@@ -277,8 +278,11 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
 
   const phaseTimings = useMemo(() => buildPhaseTimings(messages), [messages]);
 
+  const didPlan = messages.some((m) => m.phase === "planning");
+
   const visiblePhases = phaseOrder.filter((p) => {
     if (p === "generating" || p === "compiling" || p === "reviewing" || p === "done") return true;
+    if (p === "planning") return didPlan;
     if (p === "rerolling") return didReroll;
     if (p === "fixing") return didFix;
     return false;

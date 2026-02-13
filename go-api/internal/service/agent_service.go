@@ -28,7 +28,7 @@ const (
 // ProgressMsg is the WebSocket message sent to clients during generation.
 type ProgressMsg struct {
 	Type  string       `json:"type"`  // status, preview, result, error
-	Phase string       `json:"phase"` // generating, compiling, reviewing, fixing, explaining, done
+	Phase string       `json:"phase"` // planning, generating, compiling, reviewing, rerolling, fixing, done
 	Data  ProgressData `json:"data"`
 }
 

@@ -143,6 +143,10 @@ export function Sidebar() {
   const model = useSettingsStore((s) => s.model);
   const setModel = useSettingsStore((s) => s.setModel);
   const isRendering = useGenerateStore((s) => s.isRendering);
+  const isGenerating = useGenerateStore((s) => s.isGenerating);
+  const isAnalyzing = useGenerateStore((s) => s.isAnalyzing);
+  const phase = useGenerateStore((s) => s.phase);
+  const generateError = useGenerateStore((s) => s.generateError);
 
   const savedSchemes = useSavedSchemesStore((s) => s.schemes);
   const saveScheme = useSavedSchemesStore((s) => s.save);
@@ -159,6 +163,16 @@ export function Sidebar() {
   const [manualHexes, setManualHexes] = useState<string[]>(MANUAL_DEFAULTS);
 
   const isValidHex = (hex: string) => /^#[0-9a-fA-F]{6}$/.test(hex);
+
+  /** Reverse-derive approximate base hex from a line color (line ≈ base × 0.7). */
+  const lineToBaseHex = (line: string): string => {
+    const r = parseInt(line.slice(1, 3), 16);
+    const g = parseInt(line.slice(3, 5), 16);
+    const b = parseInt(line.slice(5, 7), 16);
+    const clamp = (v: number) => Math.min(255, Math.round(v / 0.7));
+    const toHex2 = (v: number) => v.toString(16).padStart(2, "0");
+    return `#${toHex2(clamp(r))}${toHex2(clamp(g))}${toHex2(clamp(b))}`;
+  };
 
   const updateManualHex = (index: number, value: string) => {
     setManualHexes((prev) => {
@@ -237,7 +251,8 @@ export function Sidebar() {
   };
 
   const handleLoadSaved = (pairs: ColorPair[]) => {
-    setCustomColors({ pairs });
+    // Load into manual hex inputs so user can preview/modify before applying
+    setManualHexes(pairs.map((p) => lineToBaseHex(p.line)));
     if (colorScheme !== "custom") {
       setColorScheme("custom");
     }
@@ -487,9 +502,38 @@ export function Sidebar() {
 
         <div>
           <label className="mb-2 block text-sm font-medium">状态</label>
-          <Badge variant={isRendering ? "default" : "secondary"}>
-            {isRendering ? "渲染中..." : "就绪"}
-          </Badge>
+          {generateError ? (
+            <Badge variant="destructive">出错</Badge>
+          ) : isGenerating && phase ? (
+            <Badge variant={phase === "done" ? "outline" : "default"} className="gap-1">
+              {phase !== "done" && (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              )}
+              {
+                {
+                  planning: "布局规划中",
+                  generating: "代码生成中",
+                  compiling: "编译渲染中",
+                  reviewing: "视觉审查中",
+                  rerolling: "重新生成中",
+                  fixing: "润色修复中",
+                  done: "生成完成",
+                }[phase] || phase
+              }
+            </Badge>
+          ) : isRendering ? (
+            <Badge variant="default" className="gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              渲染中
+            </Badge>
+          ) : isAnalyzing ? (
+            <Badge variant="default" className="gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              智能分析中
+            </Badge>
+          ) : (
+            <Badge variant="secondary">就绪</Badge>
+          )}
         </div>
       </div>
     </aside>

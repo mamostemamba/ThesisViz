@@ -108,7 +108,7 @@ func main() {
 		logger.Info("gemini client ready", zap.String("model", cfg.GeminiModel))
 
 		agents := map[string]agent.Agent{
-			"tikz":       agent.NewTikZAgent(geminiClient),
+			"tikz":       agent.NewTikZAgent(geminiClient, logger),
 			"matplotlib": agent.NewMatplotlibAgent(geminiClient),
 			"mermaid":    agent.NewMermaidAgent(geminiClient),
 		}

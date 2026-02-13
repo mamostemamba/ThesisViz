@@ -32,7 +32,7 @@ Given a piece of thesis text, analyze what kinds of figures would best illustrat
 Return a JSON array of recommendations. Each item has:
 - "title": short %s title for the recommended figure
 - "description": one-sentence %s explanation of what the figure would show
-- "drawing_prompt": a structured %s drawing instruction. This prompt will be directly sent to a code-generation agent, so be exhaustively specific. It MUST contain the following 4 sections:
+- "drawing_prompt": a SINGLE flat %s string (NOT a nested object). This prompt will be directly sent to a code-generation agent, so be exhaustively specific. It MUST contain the following 4 sections, separated by newlines within the string:
 
   Section 1 - Design Intent (1-2 sentences):
     State what information this figure aims to convey and why it is important.

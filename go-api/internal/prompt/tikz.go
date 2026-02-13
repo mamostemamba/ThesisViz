@@ -32,6 +32,12 @@ Generate TikZ code for architecture diagrams, network topologies, and module rel
   fill=highlightFill, draw=highlightLine   (emphasis / alerts)
   fill=neutralFill, draw=neutralLine       (backgrounds / borders)
 
+COLOR RULES (mandatory):
+- EVERY node MUST specify BOTH fill=xxxFill AND draw=xxxLine. Never omit either.
+- NEVER use LaTeX built-in color names (blue, red, green, yellow, cyan, magenta, etc.) — they clash with the theme.
+- Use 2-4 color categories per diagram, assigned by hierarchy/layer. You do NOT need to use all 6.
+- Same-layer nodes should share the same color category.
+
 === CRITICAL: MANDATORY LAYOUT RULES ===
 
 FORBIDDEN — NEVER DO THESE:
@@ -70,9 +76,9 @@ TEMPLATE (architecture / layered diagram):
 %% Step 2: Layer background boxes MUST go on the background layer
 %% The 'background' layer is already declared in the preamble via \pgfdeclarelayer{background}
 \begin{pgfonlayer}{background}
-  \node[layer_box=primaryLine, fit=(m-1-1)(m-1-3), label=above left:{\sffamily\bfseries Layer 1}] {};
-  \node[layer_box=secondaryLine, fit=(m-2-1)(m-2-2), label=above left:{\sffamily\bfseries Layer 2}] {};
-  \node[layer_box=tertiaryLine, fit=(m-3-1)(m-3-3), label=above left:{\sffamily\bfseries Layer 3}] {};
+  \node[layer_box=primaryLine, fit=(m-1-1)(m-1-3), label=above left:{\sffamily\normalsize\bfseries Layer 1}] {};
+  \node[layer_box=secondaryLine, fit=(m-2-1)(m-2-2), label=above left:{\sffamily\normalsize\bfseries Layer 2}] {};
+  \node[layer_box=tertiaryLine, fit=(m-3-1)(m-3-3), label=above left:{\sffamily\normalsize\bfseries Layer 3}] {};
 \end{pgfonlayer}
 
 %% Step 3: Draw ALL connections LAST — use -| or |- for Manhattan routing
@@ -91,11 +97,16 @@ MATRIX RULES (non-negotiable):
 - Override individual node styles with |[style]| prefix.
 - NEVER place ANY node outside the matrix. ALL content nodes go IN the matrix.
 - If you need more space: increase row sep (up to 2.5cm) or column sep (up to 3cm).
-- If labels are long: use text width=4cm or 5cm on individual nodes.
-- For many columns (>4): reduce text width to 2.5cm and column sep to 1.5cm.
+- For many columns (>4): reduce column sep to 1.5cm.
 - For long text labels in \node[...]{...}; syntax, you may use \\ for line breaks.
   In matrix |[style]| cells, \\ is the ROW separator — do NOT use it for line breaks inside cell text.
-  Instead, set text width on the node and let automatic wrapping handle it, or split into multiple rows.
+  Instead, add text width=Xcm on that individual node and let automatic wrapping handle it, or split into multiple rows.
+
+NODE TEXT CONCISENESS (important for readability):
+- Keep node labels SHORT: Chinese 4-8 characters, English 3-6 words.
+- Do NOT dump full sentences into node labels — summarize.
+- Only add text width=Xcm on individual nodes that genuinely need line wrapping.
+- Standalone \node[...]{long text \\ second line}; may use \\ for line breaks. Matrix cells CANNOT.
 
 === NODE TEXT RULES (prevent raw code leakage in rendered output) ===
 FORBIDDEN inside node text (especially matrix |[style]| cells):
@@ -138,8 +149,8 @@ For >5 nodes in a flow, use matrix instead of chain.
 - For bidirectional: use nice_biarrow style.
 
 === PRE-DEFINED STYLES (in preamble — USE THEM, do NOT redefine) ===
-- modern_box: Base node style with rounded corners=3pt, light drop shadow. Apply fill/draw colors.
-- matrix_node: Default matrix cell style (modern_box + text width=3.5cm). Adjust text width per node if needed.
+- modern_box: Base node style with rounded corners=3pt, \small font, light drop shadow. Apply fill/draw colors.
+- matrix_node: Default matrix cell style (modern_box + minimum width=3cm, auto-width). Add text width only on individual nodes that need wrapping.
 - nice_arrow: All connections. Usage: \draw[nice_arrow] (A) -- (B);
 - nice_biarrow: Bidirectional. Usage: \draw[nice_biarrow] (A) -- (B);
 - container_box: Dashed grouping box. Usage with fit.
@@ -147,6 +158,11 @@ For >5 nodes in a flow, use matrix instead of chain.
 - visible_brace: Thick curly brace for grouping. Usage: \draw[visible_brace] (A.north) -- (B.south) node[midway, right=16pt] {label};
 - visible_brace_mirror: Same but mirrored (opens left). Usage: \draw[visible_brace_mirror] (A.north) -- (B.south);
 NOTE: When drawing curly braces or decorative lines, ALWAYS use visible_brace/visible_brace_mirror. Do NOT use raw \draw[decorate, decoration={brace}] with default thin lines — they become invisible at low resolution.
+
+FONT HIERARCHY (for visual clarity):
+- Section/layer titles: font=\sffamily\normalsize\bfseries (larger, bold)
+- Normal node labels: default (\small via matrix_node, do NOT override)
+- Annotations or footnotes: font=\sffamily\footnotesize
 
 === STYLE & LANGUAGE ===
 - %s
@@ -160,4 +176,77 @@ NOTE: When drawing curly braces or decorative lines, ALWAYS use visible_brace/vi
 - Use color categories to convey hierarchy (primary=most important, secondary, tertiary...).
 - Keep the design clean and academic. No excessive decoration.
 `, identityBlock, langInstruction, colorPrompt)
+}
+
+// TikZLayoutPlan returns the system prompt for the layout planning phase (Phase 1).
+// The LLM is asked to output a structured JSON describing rows, columns, nodes, and edges.
+func TikZLayoutPlan(language string) string {
+	langNote := "All node labels MUST be in English."
+	if language == "zh" {
+		langNote = "All node labels MUST be in Chinese (简体中文)."
+	}
+
+	return fmt.Sprintf(`You are a layout planner for academic TikZ diagrams. Your job is to plan the structure of a diagram — you do NOT write any code.
+
+Given the user's drawing description, output a JSON object that precisely defines:
+1. How many rows the diagram has (each row = one logical layer/tier)
+2. What nodes go in each row and column
+3. What connections (edges) exist between nodes
+
+=== OUTPUT FORMAT (strict JSON, no markdown fences, no extra text) ===
+{
+  "rows": [
+    {
+      "label": "Layer name or description",
+      "nodes": [
+        {"id": "n1", "text": "Node Label"},
+        {"id": "n2", "text": "Node Label"}
+      ]
+    },
+    {
+      "label": "Second Layer",
+      "nodes": [
+        {"id": "n3", "text": "Node Label"},
+        null,
+        {"id": "n4", "text": "Node Label"}
+      ]
+    }
+  ],
+  "edges": [
+    {"from": "n1", "to": "n3", "label": "optional edge label"},
+    {"from": "n2", "to": "n4"}
+  ]
+}
+
+=== RULES ===
+- Each row is a horizontal layer. Rows are ordered top-to-bottom.
+- nodes array within a row defines columns (left-to-right). Use null for empty cells to control column alignment.
+- Every node MUST have a unique "id" (short, e.g. "n1", "enc", "db") and "text" (the visible label).
+- %s
+- Keep node text SHORT: Chinese 4-8 chars, English 3-6 words. Summarize, don't dump sentences.
+- edges define connections. "from"/"to" use node ids. "label" is optional.
+- Include ALL elements from the user's prompt. Do NOT skip or simplify.
+- Aim for 2-6 columns max per row for readability.
+- Output ONLY the JSON. No explanation, no code.`, langNote)
+}
+
+// TikZFromLayout returns the system prompt for Phase 2: generating TikZ code from a layout JSON.
+func TikZFromLayout(language, colorPrompt, identity string) string {
+	base := TikZ(language, colorPrompt, identity)
+
+	return base + `
+
+=== LAYOUT JSON GUIDANCE ===
+You are given a layout JSON that defines the exact structure of the diagram.
+You MUST follow it strictly:
+- Map each JSON row to one \matrix row.
+- Map each node in a row to one \matrix column cell, in order.
+- Use null entries as empty cells (just & with no content).
+- Use the node "id" as a comment or reference name.
+- Use the node "text" as the cell label text.
+- Create \draw edges exactly as specified in the "edges" array.
+- Do NOT invent new nodes or remove existing ones.
+- Do NOT reorder rows or columns.
+- Assign color categories by row (primary for row 1, secondary for row 2, etc.).
+`
 }

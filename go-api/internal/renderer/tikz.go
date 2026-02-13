@@ -34,7 +34,7 @@ const texTemplate = `\documentclass[border=20pt]{standalone}
         minimum width=2.8cm,
         inner sep=5pt,
         thick,
-        font=\sffamily\footnotesize,
+        font=\sffamily\small,
         drop shadow={opacity=0.08},
     },
     %% Professional arrow with Stealth tip — for ALL connections
@@ -63,7 +63,7 @@ const texTemplate = `\documentclass[border=20pt]{standalone}
         fill=neutralFill,
         fill opacity=0.3,
         inner sep=10pt,
-        font=\sffamily\small,
+        font=\sffamily\normalsize,
     },
     %% Layer row box: solid background container for a row of matrix nodes
     layer_box/.style={
@@ -73,7 +73,7 @@ const texTemplate = `\documentclass[border=20pt]{standalone}
         fill=#1!6,
         thick,
         inner sep=12pt,
-        font=\sffamily\small\bfseries,
+        font=\sffamily\normalsize\bfseries,
     },
     %% Matrix default node style
     matrix_node/.style={

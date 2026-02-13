@@ -121,6 +121,56 @@ func ReviewFix(issues []string, score float64, language, drawingPrompt string) s
 	issueText := strings.Join(issues, "\n- ")
 	issueText = "- " + issueText
 
+	fixTechniques := `
+TikZ 修复技巧（请优先使用）：
+- 节点重叠/错位 → 如果还没用 \matrix，请重构为 \matrix (m) [matrix of nodes, row sep=1.5cm, column sep=2cm, nodes={matrix_node}] { ... }; 这样网格化布局永远不会重叠。如果仍然拥挤，增大 row sep 到 2cm、column sep 到 2.5cm
+- 线条穿越节点 → 改用曼哈顿路径: \draw[nice_arrow] (m-1-1) -| (m-3-3); 或 |- 语法
+- 斜线交叉 → 拆成折线: (m-1-1.east) -- ++(0.5,0) |- (m-3-3.north);
+- 文字重叠 → 增加 row sep / column sep，或调整 text width
+- 布局溢出 → 缩小 minimum width/height，减小 column sep
+- 元素遮挡 → 在 background layer 中绘制容器框: \begin{pgfonlayer}{background} ... \end{pgfonlayer}`
+
+	fixTechniquesEN := `
+TikZ fix techniques (use these as appropriate):
+- Node overlap/misalignment → If not using \matrix yet, REFACTOR to: \matrix (m) [matrix of nodes, row sep=1.5cm, column sep=2cm, nodes={matrix_node}] { ... }; Grid layout guarantees no overlap. If still crowded, increase row sep to 2cm and column sep to 2.5cm.
+- Lines crossing nodes → Use Manhattan routing: \draw[nice_arrow] (m-1-1) -| (m-3-3); or |- syntax
+- Diagonal crossings → Break into segments: (m-1-1.east) -- ++(0.5,0) |- (m-3-3.north);
+- Text overlap → Increase row sep / column sep, or adjust text width
+- Layout overflow → Reduce minimum width/height, decrease column sep
+- Element occlusion → Draw containers on background layer: \begin{pgfonlayer}{background} ... \end{pgfonlayer}`
+
+	twoStepFormat := `
+请按以下格式输出：
+
+=== REASONING ===
+对每个问题，分析：
+1. 上一版为什么出现了这个问题（代码中哪行/哪个参数导致的）
+2. 具体的修复方案（改什么参数，改成多少）
+
+=== FIXED CODE ===
+完整的修复后 TikZ 代码（从 \begin{tikzpicture} 到 \end{tikzpicture}）
+
+修复要求：
+- 针对每个问题至少修改一个具体参数（间距、尺寸、位置等）
+- 代码必须与原版有明显差异，禁止只改注释或空白
+- 修复排版时不要删除或遗漏任何文字内容、节点或模块`
+
+	twoStepFormatEN := `
+Please use the following output format:
+
+=== REASONING ===
+For each issue, analyze:
+1. Why did this problem occur in the previous version (which line/parameter caused it)
+2. The specific fix (which parameter to change, to what value)
+
+=== FIXED CODE ===
+The complete fixed TikZ code (from \begin{tikzpicture} to \end{tikzpicture})
+
+Fix requirements:
+- For each issue, change at least one concrete parameter (spacing, size, position, etc.)
+- The code MUST differ visibly from the original — do NOT only change comments or whitespace
+- Do NOT remove or omit any text content, nodes, or modules while fixing layout`
+
 	if language == "zh" {
 		p := fmt.Sprintf("经过视觉审查，当前分数: %.0f/10，发现以下问题：\n\n%s\n\n", score, issueText)
 		if score < 6 {
@@ -129,18 +179,7 @@ func ReviewFix(issues []string, score float64, language, drawingPrompt string) s
 		if drawingPrompt != "" {
 			p += fmt.Sprintf("原始画图要求如下，修复时必须确保所有内容完整保留：\n%s\n\n", drawingPrompt)
 		}
-		p += `请修复这些问题。
-
-TikZ 修复技巧（请优先使用）：
-- 节点重叠/错位 → 如果还没用 \matrix，请重构为 \matrix (m) [matrix of nodes, row sep=1.5cm, column sep=2cm, nodes={matrix_node}] { ... }; 这样网格化布局永远不会重叠。如果仍然拥挤，增大 row sep 到 2cm、column sep 到 2.5cm
-- 线条穿越节点 → 改用曼哈顿路径: \draw[nice_arrow] (m-1-1) -| (m-3-3); 或 |- 语法
-- 斜线交叉 → 拆成折线: (m-1-1.east) -- ++(0.5,0) |- (m-3-3.north);
-- 文字重叠 → 增加 row sep / column sep，或调整 text width
-- 布局溢出 → 缩小 minimum width/height，减小 column sep
-- 元素遮挡 → 在 background layer 中绘制容器框: \begin{pgfonlayer}{background} ... \end{pgfonlayer}
-
-重要：修复排版时不要删除或遗漏任何文字内容、节点或模块。
-只输出完整的修复后代码，不要解释。`
+		p += "请修复这些问题。" + fixTechniques + twoStepFormat
 		return p
 	}
 
@@ -151,17 +190,6 @@ TikZ 修复技巧（请优先使用）：
 	if drawingPrompt != "" {
 		p += fmt.Sprintf("Original drawing requirements (all content must be preserved):\n%s\n\n", drawingPrompt)
 	}
-	p += `Please fix these issues.
-
-TikZ fix techniques (use these as appropriate):
-- Node overlap/misalignment → If not using \matrix yet, REFACTOR to: \matrix (m) [matrix of nodes, row sep=1.5cm, column sep=2cm, nodes={matrix_node}] { ... }; Grid layout guarantees no overlap. If still crowded, increase row sep to 2cm and column sep to 2.5cm.
-- Lines crossing nodes → Use Manhattan routing: \draw[nice_arrow] (m-1-1) -| (m-3-3); or |- syntax
-- Diagonal crossings → Break into segments: (m-1-1.east) -- ++(0.5,0) |- (m-3-3.north);
-- Text overlap → Increase row sep / column sep, or adjust text width
-- Layout overflow → Reduce minimum width/height, decrease column sep
-- Element occlusion → Draw containers on background layer: \begin{pgfonlayer}{background} ... \end{pgfonlayer}
-
-IMPORTANT: Do NOT remove or omit any text content, nodes, or modules while fixing layout.
-Output ONLY the complete fixed code, no explanations.`
+	p += "Please fix these issues." + fixTechniquesEN + twoStepFormatEN
 	return p
 }

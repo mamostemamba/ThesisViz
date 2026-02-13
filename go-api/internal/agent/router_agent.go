@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -13,12 +14,56 @@ import (
 
 // Recommendation is a suggested figure from the router analysis.
 type Recommendation struct {
-	Title         string `json:"title"`
-	Description   string `json:"description"`
-	DrawingPrompt string `json:"drawing_prompt"`
-	Format        string `json:"format,omitempty"`
-	Priority      int    `json:"priority"`
+	Title         string          `json:"title"`
+	Description   string          `json:"description"`
+	DrawingPrompt flexString      `json:"drawing_prompt"`
+	Format        string          `json:"format,omitempty"`
+	Priority      int             `json:"priority"`
 }
+
+// flexString unmarshals both a plain JSON string and a JSON object (flattened to string).
+// This handles LLMs that sometimes return structured objects instead of flat strings.
+type flexString string
+
+func (f *flexString) UnmarshalJSON(data []byte) error {
+	// Try plain string first
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*f = flexString(s)
+		return nil
+	}
+
+	// Try object — use Decoder with Token() to preserve key insertion order.
+	dec := json.NewDecoder(strings.NewReader(string(data)))
+	tok, err := dec.Token()
+	if err == nil {
+		if delim, ok := tok.(json.Delim); ok && delim == '{' {
+			var parts []string
+			for dec.More() {
+				keyTok, kErr := dec.Token()
+				if kErr != nil {
+					break
+				}
+				key, _ := keyTok.(string)
+				var val string
+				if vErr := dec.Decode(&val); vErr != nil {
+					break
+				}
+				parts = append(parts, key+":\n"+val)
+			}
+			if len(parts) > 0 {
+				*f = flexString(strings.Join(parts, "\n\n"))
+				return nil
+			}
+		}
+	}
+
+	// Fallback: use raw JSON as string
+	*f = flexString(string(data))
+	return nil
+}
+
+func (f flexString) String() string { return string(f) }
 
 type RouterAgent struct {
 	llm    *llm.GeminiClient
