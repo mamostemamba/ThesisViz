@@ -11,7 +11,7 @@ export interface Generation {
   parent_id?: string;
   format: "tikz" | "matplotlib" | "mermaid";
   prompt: string;
-  status: "queued" | "processing" | "success" | "failed";
+  status: "queued" | "processing" | "success" | "failed" | "cancelled";
   code?: string;
   image_key?: string;
   image_url?: string;
@@ -92,6 +92,7 @@ export interface Recommendation {
   drawing_prompt: string;
   format?: string;
   priority: number;
+  identity?: string;
 }
 
 export interface AnalyzeResponse {
@@ -108,6 +109,7 @@ export interface GenerateCreateRequest {
   thesis_title?: string;
   thesis_abstract?: string;
   model?: string;
+  identity?: string;
 }
 
 export interface GenerateCreateResponse {

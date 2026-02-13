@@ -20,7 +20,7 @@ func (a *MermaidAgent) Format() string { return "mermaid" }
 
 func (a *MermaidAgent) Generate(ctx context.Context, userPrompt string, opts AgentOpts) (string, error) {
 	scheme := opts.ResolveScheme()
-	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
+	identity := resolveIdentity(opts)
 	sysPrompt := prompt.Mermaid(opts.Language, scheme.TikZPrompt, identity)
 
 	raw, err := a.llm.Generate(ctx, sysPrompt, userPrompt, defaultTemperature, opts.Model)
@@ -32,7 +32,7 @@ func (a *MermaidAgent) Generate(ctx context.Context, userPrompt string, opts Age
 
 func (a *MermaidAgent) Refine(ctx context.Context, code, modification string, opts AgentOpts) (string, error) {
 	scheme := opts.ResolveScheme()
-	identity := buildIdentity(opts.ThesisTitle, opts.ThesisAbstract)
+	identity := resolveIdentity(opts)
 	sysPrompt := prompt.Mermaid(opts.Language, scheme.TikZPrompt, identity)
 
 	userMsg := fmt.Sprintf("Here is the current Mermaid code:\n\n%s\n\nPlease fix these issues:\n%s\n\nOutput ONLY the complete fixed Mermaid code.", code, modification)

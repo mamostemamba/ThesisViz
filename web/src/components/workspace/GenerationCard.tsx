@@ -26,6 +26,7 @@ export function GenerationCard({
     failed: "失败",
     processing: "处理中",
     queued: "排队中",
+    cancelled: "已终止",
   };
 
   const statusColor = {
@@ -33,6 +34,7 @@ export function GenerationCard({
     failed: "text-red-600",
     processing: "text-yellow-600",
     queued: "text-muted-foreground",
+    cancelled: "text-orange-600",
   }[generation.status] || "text-muted-foreground";
 
   const promptPreview =

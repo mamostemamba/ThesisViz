@@ -29,6 +29,8 @@ type AgentOpts struct {
 	ThesisTitle    string
 	ThesisAbstract string
 	Model          string
+	Identity       string                          // Domain expert identity from router analysis
+	ProgressFn     func(phase, msg string, pct int) // Optional progress callback (used by two-phase TikZ)
 }
 
 // ResolveScheme returns the appropriate Scheme — from CustomColors if set, otherwise from the preset.
@@ -39,20 +41,24 @@ func (o AgentOpts) ResolveScheme() colorscheme.Scheme {
 	return colorscheme.Get(o.ColorScheme)
 }
 
-// buildIdentity constructs a thesis identity string from title and abstract.
-func buildIdentity(title, abstract string) string {
-	if title == "" && abstract == "" {
+// resolveIdentity returns the domain expert identity from router analysis if set,
+// otherwise falls back to constructing one from title/abstract.
+func resolveIdentity(opts AgentOpts) string {
+	if opts.Identity != "" {
+		return opts.Identity
+	}
+	if opts.ThesisTitle == "" && opts.ThesisAbstract == "" {
 		return ""
 	}
 	identity := ""
-	if title != "" {
-		identity += "Thesis: " + title
+	if opts.ThesisTitle != "" {
+		identity += "Thesis: " + opts.ThesisTitle
 	}
-	if abstract != "" {
+	if opts.ThesisAbstract != "" {
 		if identity != "" {
 			identity += ". "
 		}
-		identity += "Abstract: " + abstract
+		identity += "Abstract: " + opts.ThesisAbstract
 	}
 	return identity
 }

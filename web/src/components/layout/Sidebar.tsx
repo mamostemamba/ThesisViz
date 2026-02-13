@@ -144,6 +144,7 @@ export function Sidebar() {
   const setModel = useSettingsStore((s) => s.setModel);
   const isRendering = useGenerateStore((s) => s.isRendering);
   const isGenerating = useGenerateStore((s) => s.isGenerating);
+  const isCancelled = useGenerateStore((s) => s.isCancelled);
   const isAnalyzing = useGenerateStore((s) => s.isAnalyzing);
   const phase = useGenerateStore((s) => s.phase);
   const generateError = useGenerateStore((s) => s.generateError);
@@ -504,21 +505,22 @@ export function Sidebar() {
           <label className="mb-2 block text-sm font-medium">状态</label>
           {generateError ? (
             <Badge variant="destructive">出错</Badge>
-          ) : isGenerating && phase ? (
+          ) : isCancelled && !isGenerating ? (
+            <Badge variant="outline" className="border-orange-400 text-orange-600">已终止</Badge>
+          ) : isGenerating ? (
             <Badge variant={phase === "done" ? "outline" : "default"} className="gap-1">
               {phase !== "done" && (
                 <Loader2 className="h-3 w-3 animate-spin" />
               )}
               {
                 {
-                  planning: "布局规划中",
                   generating: "代码生成中",
                   compiling: "编译渲染中",
                   reviewing: "视觉审查中",
                   rerolling: "重新生成中",
                   fixing: "润色修复中",
                   done: "生成完成",
-                }[phase] || phase
+                }[phase] || "生成中"
               }
             </Badge>
           ) : isRendering ? (

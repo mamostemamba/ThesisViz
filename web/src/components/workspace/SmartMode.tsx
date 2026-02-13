@@ -16,8 +16,8 @@ import { useAnalyze, useGenerateCreate } from "@/lib/queries";
 import { connectGeneration, type WSMessage } from "@/lib/ws";
 import { ProgressStream, collectImageSnapshots } from "./ProgressStream";
 import { ResultPanel } from "./ResultPanel";
-import { generateCreate } from "@/lib/api";
-import { Search, Sparkles, Loader2 } from "lucide-react";
+import { generateCreate, cancelGeneration } from "@/lib/api";
+import { Search, Sparkles, Loader2, StopCircle } from "lucide-react";
 import type { Recommendation } from "@/types/api";
 
 interface SmartModeProps {
@@ -43,12 +43,14 @@ export function SmartMode({ projectId }: SmartModeProps) {
   const phase = useGenerateStore((s) => s.phase);
   const progress = useGenerateStore((s) => s.progress);
   const isGenerating = useGenerateStore((s) => s.isGenerating);
+  const isCancelled = useGenerateStore((s) => s.isCancelled);
   const result = useGenerateStore((s) => s.result);
   const generateError = useGenerateStore((s) => s.generateError);
   const setTaskId = useGenerateStore((s) => s.setTaskId);
   const setPhase = useGenerateStore((s) => s.setPhase);
   const pushProgress = useGenerateStore((s) => s.pushProgress);
   const setIsGenerating = useGenerateStore((s) => s.setIsGenerating);
+  const setIsCancelled = useGenerateStore((s) => s.setIsCancelled);
   const setResult = useGenerateStore((s) => s.setResult);
   const setGenerateError = useGenerateStore((s) => s.setGenerateError);
   const resetGeneration = useGenerateStore((s) => s.resetGeneration);
@@ -103,8 +105,30 @@ export function SmartMode({ projectId }: SmartModeProps) {
     }
   }, [text, language, thesisTitle, thesisAbstract, model, analyzeMutation, resetGeneration, setIsAnalyzing]);
 
+  const handleCancel = useCallback(async () => {
+    const currentTaskId = useGenerateStore.getState().taskId;
+    if (currentTaskId) {
+      try {
+        await cancelGeneration(currentTaskId);
+      } catch {
+        // ignore cancel errors
+      }
+    }
+  }, []);
+
   const startGeneration = useCallback(
-    async (prompt: string, fmt?: string, keepResult?: boolean) => {
+    async (prompt: string, fmt?: string, keepResult?: boolean, identity?: string) => {
+      // Auto-cancel old task if still generating
+      const prevState = useGenerateStore.getState();
+      if (prevState.taskId && prevState.isGenerating) {
+        try {
+          await cancelGeneration(prevState.taskId);
+        } catch {
+          // ignore
+        }
+        wsCleanupRef.current?.();
+      }
+
       if (keepResult) {
         // Refine: keep old result visible, only clear progress/error
         useGenerateStore.setState({
@@ -112,6 +136,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
           phase: "",
           progress: [],
           generateError: null,
+          isCancelled: false,
         });
       } else {
         resetGeneration();
@@ -130,14 +155,16 @@ export function SmartMode({ projectId }: SmartModeProps) {
           thesis_title: thesisTitle || undefined,
           thesis_abstract: thesisAbstract || undefined,
           model,
+          identity: identity || undefined,
         });
 
         setTaskId(res.task_id);
 
-        // Connect WebSocket
+        // Connect WebSocket — close old one first
         wsCleanupRef.current?.();
+        const activeTaskId = res.task_id;
         wsCleanupRef.current = connectGeneration(
-          res.task_id,
+          activeTaskId,
           (msg: WSMessage) => {
             pushProgress(msg);
             setPhase(msg.phase);
@@ -158,14 +185,21 @@ export function SmartMode({ projectId }: SmartModeProps) {
               setIsGenerating(false);
             }
 
+            if (msg.type === "cancelled") {
+              setIsCancelled(true);
+              setIsGenerating(false);
+            }
+
             if (msg.type === "error") {
               setGenerateError(msg.data.message || "Generation failed");
               setIsGenerating(false);
             }
           },
           () => {
-            // on close, if still generating mark as done
-            if (useGenerateStore.getState().isGenerating) {
+            // Only reset if this WS belongs to the still-active task.
+            // Prevents stale onClose from a previous WS canceling the new generation.
+            const state = useGenerateStore.getState();
+            if (state.taskId === activeTaskId && state.isGenerating) {
               setIsGenerating(false);
             }
           }
@@ -191,6 +225,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
       setPhase,
       pushProgress,
       setIsGenerating,
+      setIsCancelled,
       setResult,
       setGenerateError,
     ]
@@ -298,23 +333,37 @@ export function SmartMode({ projectId }: SmartModeProps) {
               onChange={(e) => setEditingPrompt(e.target.value)}
               className="min-h-[120px] text-sm"
             />
-            <Button
-              onClick={() =>
-                startGeneration(
-                  editingPrompt,
-                  selectedRec.format || format
-                )
-              }
-              disabled={!editingPrompt.trim() || isGenerating}
-              className="w-full"
-            >
-              {isGenerating ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="mr-2 h-4 w-4" />
+            <div className="flex gap-2">
+              <Button
+                onClick={() =>
+                  startGeneration(
+                    editingPrompt,
+                    selectedRec.format || format,
+                    false,
+                    selectedRec.identity
+                  )
+                }
+                disabled={!editingPrompt.trim() || isGenerating}
+                className="flex-1"
+              >
+                {isGenerating ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                {isGenerating ? "生成中..." : "确认生成"}
+              </Button>
+              {isGenerating && (
+                <Button
+                  variant="destructive"
+                  onClick={handleCancel}
+                  className="shrink-0"
+                >
+                  <StopCircle className="mr-2 h-4 w-4" />
+                  终止
+                </Button>
               )}
-              {isGenerating ? "生成中..." : "确认生成"}
-            </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -323,6 +372,13 @@ export function SmartMode({ projectId }: SmartModeProps) {
       {progress.length > 0 && (
         <div ref={progressRef}>
           <ProgressStream messages={progress} phase={phase} />
+        </div>
+      )}
+
+      {/* Cancelled */}
+      {isCancelled && !isGenerating && (
+        <div className="rounded border border-orange-200 bg-orange-50 p-3 text-sm text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300">
+          生成已终止
         </div>
       )}
 

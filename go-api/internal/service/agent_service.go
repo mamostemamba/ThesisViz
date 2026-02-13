@@ -28,7 +28,7 @@ const (
 // ProgressMsg is the WebSocket message sent to clients during generation.
 type ProgressMsg struct {
 	Type  string       `json:"type"`  // status, preview, result, error
-	Phase string       `json:"phase"` // planning, generating, compiling, reviewing, rerolling, fixing, done
+	Phase string       `json:"phase"` // generating, compiling, reviewing, rerolling, fixing, done
 	Data  ProgressData `json:"data"`
 }
 
@@ -59,6 +59,7 @@ type GenerateRequest struct {
 	ThesisTitle    string
 	ThesisAbstract string
 	Model          string
+	Identity       string
 }
 
 type RefineRequest struct {
@@ -164,6 +165,7 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 		ThesisTitle:    req.ThesisTitle,
 		ThesisAbstract: req.ThesisAbstract,
 		Model:          req.Model,
+		Identity:       req.Identity,
 	}
 
 	// Create generation record
@@ -183,22 +185,28 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 	}
 
 	// === Phase 1: Generate code ===
-	// For tikz, the agent internally does a two-step chain (layout planning → code gen).
-	// We push a "planning" phase hint so the user sees what's happening.
-	if req.Format == "tikz" {
-		pushFn(ProgressMsg{Type: "status", Phase: "planning", Data: ProgressData{
-			Message: "规划图表布局...", Progress: 5,
+	// Set up progress callback for agents that support sub-phase reporting (e.g. TikZ two-phase pipeline).
+	opts.ProgressFn = func(phase, msg string, progress int) {
+		pushFn(ProgressMsg{Type: "status", Phase: phase, Data: ProgressData{
+			Message: msg, Progress: progress,
 		}})
 	}
 
-	pushFn(ProgressMsg{Type: "status", Phase: "generating", Data: ProgressData{
-		Message: "Generating code...", Progress: 10,
-	}})
+	// For non-TikZ agents, send initial "generating" status (TikZ sends its own "planning" first).
+	if req.Format != "tikz" {
+		pushFn(ProgressMsg{Type: "status", Phase: "generating", Data: ProgressData{
+			Message: "Generating code...", Progress: 10,
+		}})
+	}
 
 	code, err := ag.Generate(ctx, req.Prompt, opts)
 	if err != nil {
-		pushFn(ProgressMsg{Type: "error", Phase: "generating", Data: ProgressData{Message: err.Error()}})
-		s.markFailed(gen)
+		if ctx.Err() != nil {
+			s.markCancelled(gen)
+		} else {
+			pushFn(ProgressMsg{Type: "error", Phase: "generating", Data: ProgressData{Message: err.Error()}})
+			s.markFailed(gen)
+		}
 		return nil, err
 	}
 
@@ -209,7 +217,11 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 	// === Phase 2: Compile + fix ===
 	code, imageURL, imageKey, imageBytes, err := s.compileWithRetries(ctx, ag, code, req, opts, pushFn)
 	if err != nil {
-		s.markFailed(gen)
+		if ctx.Err() != nil {
+			s.markCancelled(gen)
+		} else {
+			s.markFailed(gen)
+		}
 		return nil, err
 	}
 
@@ -218,6 +230,12 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 	code = rr.Code
 	imageURL = rr.ImageURL
 	imageKey = rr.ImageKey
+
+	// Check if cancelled during review
+	if ctx.Err() != nil {
+		s.markCancelled(gen)
+		return nil, ctx.Err()
+	}
 
 	// === Phase 4: Save result ===
 	codePtr := &code
@@ -774,6 +792,11 @@ func (s *AgentService) doReview(ctx context.Context, imageBytes []byte, drawingP
 
 func (s *AgentService) markFailed(gen *model.Generation) {
 	gen.Status = "failed"
+	_ = s.genSvc.Update(gen)
+}
+
+func (s *AgentService) markCancelled(gen *model.Generation) {
+	gen.Status = "cancelled"
 	_ = s.genSvc.Update(gen)
 }
 

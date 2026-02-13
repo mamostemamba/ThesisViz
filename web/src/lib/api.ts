@@ -136,6 +136,12 @@ export async function analyzeText(data: AnalyzeRequest) {
   });
 }
 
+export async function cancelGeneration(taskId: string) {
+  return apiFetch<{ status: string }>(`/api/v1/generate/cancel/${taskId}`, {
+    method: "POST",
+  });
+}
+
 export async function generateCreate(data: GenerateCreateRequest) {
   return apiFetch<GenerateCreateResponse>("/api/v1/generate/create", {
     method: "POST",

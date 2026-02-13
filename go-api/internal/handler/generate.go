@@ -78,6 +78,7 @@ type createRequest struct {
 	ThesisTitle    string                   `json:"thesis_title"`
 	ThesisAbstract string                   `json:"thesis_abstract"`
 	Model          string                   `json:"model"`
+	Identity       string                   `json:"identity"`
 }
 
 // Create handles POST /api/v1/generate/create
@@ -103,6 +104,8 @@ func (h *GenerateHandler) Create(c *gin.Context) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
 		defer cancel()
+		h.hub.RegisterCancel(taskID, cancel)
+
 		pushFn := func(msg service.ProgressMsg) {
 			_ = h.hub.Send(taskID, msg)
 		}
@@ -117,15 +120,19 @@ func (h *GenerateHandler) Create(c *gin.Context) {
 			ThesisTitle:    req.ThesisTitle,
 			ThesisAbstract: req.ThesisAbstract,
 			Model:          req.Model,
+			Identity:       req.Identity,
 		}, pushFn)
 
 		if err != nil {
 			h.logger.Error("generation failed", zap.String("task_id", taskID), zap.Error(err))
-			_ = h.hub.Send(taskID, service.ProgressMsg{
-				Type:  "error",
-				Phase: "done",
-				Data:  service.ProgressData{Message: err.Error()},
-			})
+			if ctx.Err() == nil {
+				// Only send error if not cancelled — cancelled tasks send their own message
+				_ = h.hub.Send(taskID, service.ProgressMsg{
+					Type:  "error",
+					Phase: "done",
+					Data:  service.ProgressData{Message: err.Error()},
+				})
+			}
 		}
 	}()
 
@@ -161,6 +168,8 @@ func (h *GenerateHandler) Refine(c *gin.Context) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
 		defer cancel()
+		h.hub.RegisterCancel(taskID, cancel)
+
 		pushFn := func(msg service.ProgressMsg) {
 			_ = h.hub.Send(taskID, msg)
 		}
@@ -176,15 +185,30 @@ func (h *GenerateHandler) Refine(c *gin.Context) {
 
 		if err != nil {
 			h.logger.Error("refine failed", zap.String("task_id", taskID), zap.Error(err))
-			_ = h.hub.Send(taskID, service.ProgressMsg{
-				Type:  "error",
-				Phase: "done",
-				Data:  service.ProgressData{Message: err.Error()},
-			})
+			if ctx.Err() == nil {
+				_ = h.hub.Send(taskID, service.ProgressMsg{
+					Type:  "error",
+					Phase: "done",
+					Data:  service.ProgressData{Message: err.Error()},
+				})
+			}
 		}
 	}()
 
 	c.JSON(http.StatusOK, gin.H{"task_id": taskID})
+}
+
+// Cancel handles POST /api/v1/generate/cancel/:taskId
+func (h *GenerateHandler) Cancel(c *gin.Context) {
+	taskID := c.Param("taskId")
+	// Send cancelled message before cancelling context to avoid race
+	_ = h.hub.Send(taskID, service.ProgressMsg{
+		Type:  "cancelled",
+		Phase: "done",
+		Data:  service.ProgressData{Message: "任务已终止"},
+	})
+	h.hub.CancelTask(taskID)
+	c.JSON(http.StatusOK, gin.H{"status": "cancelled"})
 }
 
 // Get handles GET /api/v1/generate/:id

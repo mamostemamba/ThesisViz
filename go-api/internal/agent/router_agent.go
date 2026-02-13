@@ -19,6 +19,7 @@ type Recommendation struct {
 	DrawingPrompt flexString      `json:"drawing_prompt"`
 	Format        string          `json:"format,omitempty"`
 	Priority      int             `json:"priority"`
+	Identity      string          `json:"identity,omitempty"`
 }
 
 // flexString unmarshals both a plain JSON string and a JSON object (flattened to string).

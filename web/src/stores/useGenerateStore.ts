@@ -21,6 +21,7 @@ interface GenerateState {
   phase: string;
   progress: WSMessage[];
   isGenerating: boolean;
+  isCancelled: boolean;
   result: {
     generationId: string;
     code: string;
@@ -40,6 +41,7 @@ interface GenerateState {
   setPhase: (phase: string) => void;
   pushProgress: (msg: WSMessage) => void;
   setIsGenerating: (v: boolean) => void;
+  setIsCancelled: (v: boolean) => void;
   setResult: (result: GenerateState["result"]) => void;
   setExplanation: (text: string) => void;
   setGenerateError: (err: string | null) => void;
@@ -66,6 +68,7 @@ export const useGenerateStore = create<GenerateState>((set) => ({
   phase: "",
   progress: [],
   isGenerating: false,
+  isCancelled: false,
   result: null,
   explanation: "",
   generateError: null,
@@ -75,6 +78,7 @@ export const useGenerateStore = create<GenerateState>((set) => ({
   pushProgress: (msg) =>
     set((state) => ({ progress: [...state.progress, msg] })),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
+  setIsCancelled: (isCancelled) => set({ isCancelled }),
   setResult: (result) => set({ result }),
   setExplanation: (explanation) => set({ explanation }),
   setGenerateError: (generateError) => set({ generateError }),
@@ -84,6 +88,7 @@ export const useGenerateStore = create<GenerateState>((set) => ({
       phase: "",
       progress: [],
       isGenerating: false,
+      isCancelled: false,
       result: null,
       explanation: "",
       generateError: null,

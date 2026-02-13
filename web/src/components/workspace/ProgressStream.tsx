@@ -42,15 +42,6 @@ function buildPhaseTimings(messages: WSMessage[]): Map<string, PhaseTiming> {
     }
   }
 
-  // "planning" and "generating" are pushed back-to-back before ag.Generate(),
-  // so fold planning's startTs into generating to measure the real total time.
-  const planning = map.get("planning");
-  const generating = map.get("generating");
-  if (planning && generating) {
-    generating.startTs = planning.startTs;
-    map.delete("planning");
-  }
-
   // Set endTs for each phase = startTs of the next phase that appeared
   const ordered = phaseOrder.filter((p) => map.has(p));
   for (let i = 0; i < ordered.length - 1; i++) {
@@ -278,18 +269,18 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
   const appearedPhases = new Set<string>(messages.map((m) => m.phase));
   appearedPhases.add(phase);
 
+  const didPlan = messages.some((m) => m.phase === "planning");
   const didReroll = messages.some((m) => m.phase === "rerolling");
   const didFix = messages.some((m) => m.phase === "fixing");
 
   const errorMsg = messages.find((m) => m.type === "error")?.data.message;
+  const cancelledMsg = messages.find((m) => m.type === "cancelled");
 
   const imageSnapshots = collectImageSnapshots(messages);
   const codeSnapshots = collectCodeSnapshots(messages);
   const latestImage = imageSnapshots.length > 0 ? imageSnapshots[imageSnapshots.length - 1] : null;
 
   const phaseTimings = useMemo(() => buildPhaseTimings(messages), [messages]);
-
-  const didPlan = messages.some((m) => m.phase === "planning");
 
   const visiblePhases = phaseOrder.filter((p) => {
     if (p === "generating" || p === "compiling" || p === "reviewing" || p === "done") return true;
@@ -323,8 +314,7 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
                     {(p === "reviewing" || p === "rerolling" || p === "fixing") && phaseScore != null && phaseScore > 0 && (
                       <ScoreBadge score={phaseScore} />
                     )}
-                    {/* planning has no separate timing — folded into generating */}
-                    {p !== "planning" && <PhaseTimer timing={timing} isActive={isActive} />}
+                    <PhaseTimer timing={timing} isActive={isActive} />
                   </div>
                   {statusText && isActive && (
                     <p className="ml-6 text-xs text-muted-foreground">{statusText}</p>
@@ -333,6 +323,15 @@ export function ProgressStream({ messages, phase }: ProgressStreamProps) {
               );
             })}
           </div>
+
+          {cancelledMsg && (
+            <div className="rounded border border-orange-200 bg-orange-50 p-2 text-xs dark:border-orange-800 dark:bg-orange-950">
+              <div className="flex items-center gap-1 font-medium text-orange-700 dark:text-orange-300">
+                <XCircle className="h-3 w-3" />
+                生成已终止
+              </div>
+            </div>
+          )}
 
           {errorMsg && (
             <div className="rounded border border-red-200 bg-red-50 p-2 text-xs dark:border-red-800 dark:bg-red-950">

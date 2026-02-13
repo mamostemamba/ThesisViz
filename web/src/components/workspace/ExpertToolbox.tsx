@@ -9,9 +9,9 @@ import { ProgressStream } from "./ProgressStream";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useRender } from "@/lib/queries";
-import { exportTeX, generateCreate } from "@/lib/api";
+import { exportTeX, generateCreate, cancelGeneration } from "@/lib/api";
 import { connectGeneration, type WSMessage } from "@/lib/ws";
-import { Play, Copy, Check, Sparkles, Loader2, Download, ExternalLink } from "lucide-react";
+import { Play, Copy, Check, Sparkles, Loader2, Download, ExternalLink, StopCircle } from "lucide-react";
 
 interface ExpertToolboxProps {
   projectId?: string;
@@ -41,7 +41,9 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
   const [aiProgress, setAiProgress] = useState<WSMessage[]>([]);
   const [aiPhase, setAiPhase] = useState("");
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiCancelled, setAiCancelled] = useState(false);
   const wsCleanupRef = useRef<(() => void) | null>(null);
+  const activeTaskRef = useRef<string | null>(null);
 
   // Track if we've rendered at least once (to enable auto-render on scheme change)
   const hasRendered = useRef(false);
@@ -127,12 +129,35 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
     }
   };
 
+  const handleAICancel = useCallback(async () => {
+    const currentTaskId = activeTaskRef.current;
+    if (currentTaskId) {
+      try {
+        await cancelGeneration(currentTaskId);
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
   const handleAIGenerate = useCallback(async () => {
     if (!aiPrompt.trim()) return;
+
+    // Auto-cancel old task if still generating
+    if (activeTaskRef.current && aiGenerating) {
+      try {
+        await cancelGeneration(activeTaskRef.current);
+      } catch {
+        // ignore
+      }
+      wsCleanupRef.current?.();
+    }
+
     setAiGenerating(true);
     setAiProgress([]);
     setAiPhase("");
     setAiError(null);
+    setAiCancelled(false);
 
     try {
       const res = await generateCreate({
@@ -146,8 +171,10 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
       });
 
       wsCleanupRef.current?.();
+      const activeTaskId = res.task_id;
+      activeTaskRef.current = activeTaskId;
       wsCleanupRef.current = connectGeneration(
-        res.task_id,
+        activeTaskId,
         (msg: WSMessage) => {
           setAiProgress((prev) => [...prev, msg]);
           setAiPhase(msg.phase);
@@ -164,13 +191,21 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
             setAiGenerating(false);
           }
 
+          if (msg.type === "cancelled") {
+            setAiCancelled(true);
+            setAiGenerating(false);
+          }
+
           if (msg.type === "error") {
             setAiError(msg.data.message || "Generation failed");
             setAiGenerating(false);
           }
         },
         () => {
-          setAiGenerating(false);
+          // Only reset if this WS belongs to the still-active task.
+          if (activeTaskRef.current === activeTaskId) {
+            setAiGenerating(false);
+          }
         }
       );
     } catch (err) {
@@ -179,7 +214,7 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
       );
       setAiGenerating(false);
     }
-  }, [aiPrompt, projectId, format, language, colorScheme, customColors, model, setCode, setImageUrl]);
+  }, [aiPrompt, aiGenerating, projectId, format, language, colorScheme, customColors, model, setCode, setImageUrl]);
 
   return (
     <div className="flex h-[calc(100vh-10rem)] flex-col gap-3">
@@ -208,11 +243,28 @@ export function ExpertToolbox({ projectId }: ExpertToolboxProps) {
           )}
           {aiGenerating ? "生成中..." : "AI 生成"}
         </Button>
+        {aiGenerating && (
+          <Button
+            variant="destructive"
+            onClick={handleAICancel}
+            size="sm"
+          >
+            <StopCircle className="mr-2 h-4 w-4" />
+            终止
+          </Button>
+        )}
       </div>
 
       {/* AI Progress */}
       {aiGenerating && aiProgress.length > 0 && (
         <ProgressStream messages={aiProgress} phase={aiPhase} />
+      )}
+
+      {/* AI Cancelled */}
+      {aiCancelled && !aiGenerating && (
+        <div className="rounded border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300">
+          生成已终止
+        </div>
       )}
 
       {/* AI Error */}

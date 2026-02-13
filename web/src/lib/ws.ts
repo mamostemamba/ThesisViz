@@ -1,5 +1,5 @@
 export interface WSMessage {
-  type: "status" | "preview" | "result" | "error";
+  type: "status" | "preview" | "result" | "error" | "cancelled";
   phase:
     | "planning"
     | "generating"

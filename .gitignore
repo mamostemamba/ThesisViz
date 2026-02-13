@@ -42,4 +42,5 @@ docker-compose.override.yml
 
 # === Project ===
 source_for_review/
+go-api/reference_tex/
 .claude

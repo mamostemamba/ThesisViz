@@ -19,6 +19,7 @@ export function HistoryPanel({ projectId, onLoadResult }: HistoryPanelProps) {
   const setCode = useGenerateStore((s) => s.setCode);
   const setImageUrl = useGenerateStore((s) => s.setImageUrl);
   const setResult = useGenerateStore((s) => s.setResult);
+  const setIsCancelled = useGenerateStore((s) => s.setIsCancelled);
   const setFormat = useSettingsStore((s) => s.setFormat);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -28,6 +29,7 @@ export function HistoryPanel({ projectId, onLoadResult }: HistoryPanelProps) {
   const handleSelect = async (gen: Generation) => {
     setSelectedId(gen.id);
     setLoadingDetail(true);
+    setIsCancelled(false);
 
     try {
       const detail = await getGenerationDetail(gen.id);
