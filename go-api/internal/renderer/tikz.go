@@ -32,9 +32,10 @@ const texTemplate = `\documentclass[border=20pt]{standalone}
         align=center,
         minimum height=0.9cm,
         minimum width=2.8cm,
+        inner sep=5pt,
         thick,
-        font=\sffamily\small,
-        drop shadow={opacity=0.15},
+        font=\sffamily\footnotesize,
+        drop shadow={opacity=0.08},
     },
     %% Professional arrow with Stealth tip — for ALL connections
     nice_arrow/.style={
@@ -42,7 +43,7 @@ const texTemplate = `\documentclass[border=20pt]{standalone}
         >={Stealth[length=5pt, width=4pt]},
         thick,
         rounded corners=3pt,
-        draw=neutralLine,
+        draw=black!70,
     },
     %% Bidirectional arrow
     nice_biarrow/.style={
@@ -50,7 +51,7 @@ const texTemplate = `\documentclass[border=20pt]{standalone}
         >={Stealth[length=5pt, width=4pt]},
         thick,
         rounded corners=3pt,
-        draw=neutralLine,
+        draw=black!70,
     },
     %% Dashed container for grouping nodes (use with fit)
     container_box/.style={
@@ -77,8 +78,8 @@ const texTemplate = `\documentclass[border=20pt]{standalone}
     %% Matrix default node style
     matrix_node/.style={
         modern_box,
-        text width=3.5cm,
-        minimum height=1.1cm,
+        minimum width=3cm,
+        minimum height=1.0cm,
     },
     %% Visible brace: extra-thick curly brace for grouping (survives image compression)
     visible_brace/.style={
@@ -132,7 +133,7 @@ func (r *TikZRenderer) Render(ctx context.Context, code string, opts RenderOpts)
 		colors = defaultColors
 	}
 
-	cleanCode := sanitize.TikZ(code)
+	cleanCode := sanitize.TikZClean(code)
 	ctexLine := ""
 	if lang == "zh" {
 		ctexLine = `\usepackage{ctex}`
@@ -204,7 +205,7 @@ func (r *TikZRenderer) Render(ctx context.Context, code string, opts RenderOpts)
 
 // BuildFullTeX returns the complete .tex source for a TikZ code snippet.
 func BuildFullTeX(tikzCode, colorDefs, language string) string {
-	cleanCode := sanitize.TikZ(tikzCode)
+	cleanCode := sanitize.TikZClean(tikzCode)
 	ctexLine := ""
 	if strings.EqualFold(language, "zh") {
 		ctexLine = `\usepackage{ctex}`

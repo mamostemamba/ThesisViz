@@ -52,6 +52,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
   const setResult = useGenerateStore((s) => s.setResult);
   const setGenerateError = useGenerateStore((s) => s.setGenerateError);
   const resetGeneration = useGenerateStore((s) => s.resetGeneration);
+  const setIsAnalyzing = useGenerateStore((s) => s.setIsAnalyzing);
 
   const analyzeMutation = useAnalyze();
   const wsCleanupRef = useRef<(() => void) | null>(null);
@@ -86,16 +87,21 @@ export function SmartMode({ projectId }: SmartModeProps) {
     setSelectedRec(null);
     setEditingPrompt(null);
     resetGeneration();
+    setIsAnalyzing(true);
 
-    const res = await analyzeMutation.mutateAsync({
-      text,
-      language,
-      thesis_title: thesisTitle || undefined,
-      thesis_abstract: thesisAbstract || undefined,
-      model,
-    });
-    setRecommendations(res.recommendations || []);
-  }, [text, language, thesisTitle, thesisAbstract, model, analyzeMutation, resetGeneration]);
+    try {
+      const res = await analyzeMutation.mutateAsync({
+        text,
+        language,
+        thesis_title: thesisTitle || undefined,
+        thesis_abstract: thesisAbstract || undefined,
+        model,
+      });
+      setRecommendations(res.recommendations || []);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [text, language, thesisTitle, thesisAbstract, model, analyzeMutation, resetGeneration, setIsAnalyzing]);
 
   const startGeneration = useCallback(
     async (prompt: string, fmt?: string, keepResult?: boolean) => {
@@ -147,6 +153,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
                 reviewRounds: msg.data.review_rounds || 0,
                 reviewCritique: msg.data.critique || "",
                 reviewIssues: msg.data.issues || [],
+                fullTex: msg.data.full_tex || "",
               });
               setIsGenerating(false);
             }
@@ -342,6 +349,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
           isRefining={isGenerating}
           parentCode={parentCode}
           imageSnapshots={collectImageSnapshots(progress)}
+          fullTex={result.fullTex}
         />
         </div>
       )}

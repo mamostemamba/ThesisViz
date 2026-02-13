@@ -48,6 +48,7 @@ export function HistoryPanel({ projectId, onLoadResult }: HistoryPanelProps) {
         reviewRounds: 0,
         reviewCritique: "",
         reviewIssues: [],
+        fullTex: "",
       });
       onLoadResult?.();
     } catch {

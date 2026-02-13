@@ -1,6 +1,7 @@
 export interface WSMessage {
   type: "status" | "preview" | "result" | "error";
   phase:
+    | "planning"
     | "generating"
     | "compiling"
     | "reviewing"
@@ -24,6 +25,7 @@ export interface WSMessage {
     review_rounds?: number;
     critique?: string;
     score?: number;
+    full_tex?: string;
   };
 }
 

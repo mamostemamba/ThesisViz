@@ -13,6 +13,7 @@ import (
 	"github.com/thesisviz/go-api/internal/llm"
 	"github.com/thesisviz/go-api/internal/model"
 	"github.com/thesisviz/go-api/internal/prompt"
+	"github.com/thesisviz/go-api/internal/renderer"
 	"github.com/thesisviz/go-api/internal/storage"
 	"github.com/thesisviz/go-api/pkg/colorscheme"
 )
@@ -45,6 +46,7 @@ type ProgressData struct {
 	ReviewRounds int      `json:"review_rounds,omitempty"`
 	Critique     string   `json:"critique,omitempty"`
 	Score        float64  `json:"score,omitempty"`
+	FullTeX      string   `json:"full_tex,omitempty"`
 }
 
 type GenerateRequest struct {
@@ -84,6 +86,7 @@ type GenerateResult struct {
 	ImageURL     string
 	ReviewPassed bool
 	ReviewRounds int
+	FullTeX      string
 }
 
 type AgentService struct {
@@ -125,6 +128,14 @@ func (s *AgentService) Analyze(ctx context.Context, req AnalyzeRequest) ([]agent
 		Model:          req.Model,
 	}
 	return s.router.Analyze(ctx, req.Text, opts)
+}
+
+// resolveColors returns the TikZ color definition block for the given scheme.
+func resolveColors(colorScheme string, customColors *colorscheme.CustomColors) string {
+	if customColors != nil {
+		return colorscheme.AllTikZColorsCustom(*customColors)
+	}
+	return colorscheme.AllTikZColors(colorScheme)
 }
 
 // reviewPhaseResult holds the outcome of the visual review phase.
@@ -172,6 +183,14 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 	}
 
 	// === Phase 1: Generate code ===
+	// For tikz, the agent internally does a two-step chain (layout planning → code gen).
+	// We push a "planning" phase hint so the user sees what's happening.
+	if req.Format == "tikz" {
+		pushFn(ProgressMsg{Type: "status", Phase: "planning", Data: ProgressData{
+			Message: "规划图表布局...", Progress: 5,
+		}})
+	}
+
 	pushFn(ProgressMsg{Type: "status", Phase: "generating", Data: ProgressData{
 		Message: "Generating code...", Progress: 10,
 	}})
@@ -217,6 +236,13 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 	}
 	_ = s.genSvc.Update(gen)
 
+	// Build full .tex for Overleaf-ready copy
+	var fullTeX string
+	if req.Format == "tikz" {
+		colors := resolveColors(req.ColorScheme, req.CustomColors)
+		fullTeX = renderer.BuildFullTeX(code, colors, req.Language)
+	}
+
 	result := &GenerateResult{
 		GenerationID: gen.ID.String(),
 		Code:         code,
@@ -224,6 +250,7 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 		ImageURL:     imageURL,
 		ReviewPassed: rr.ReviewPassed,
 		ReviewRounds: rr.ReviewRounds,
+		FullTeX:      fullTeX,
 	}
 
 	pushFn(ProgressMsg{Type: "result", Phase: "done", Data: ProgressData{
@@ -238,6 +265,7 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 		Critique:     rr.Critique,
 		Issues:       rr.Issues,
 		Score:        rr.Score,
+		FullTeX:      fullTeX,
 	}})
 
 	return result, nil

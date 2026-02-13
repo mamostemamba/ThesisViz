@@ -12,6 +12,10 @@ interface GenerateState {
   setIsRendering: (v: boolean) => void;
   setRenderError: (err: string | null) => void;
 
+  // AI analysis state (smart mode "分析" step)
+  isAnalyzing: boolean;
+  setIsAnalyzing: (v: boolean) => void;
+
   // AI generation state
   taskId: string | null;
   phase: string;
@@ -27,6 +31,7 @@ interface GenerateState {
     reviewRounds: number;
     reviewCritique: string;
     reviewIssues: string[];
+    fullTex: string;
   } | null;
   explanation: string;
   generateError: string | null;
@@ -51,6 +56,10 @@ export const useGenerateStore = create<GenerateState>((set) => ({
   setImageUrl: (imageUrl) => set({ imageUrl }),
   setIsRendering: (isRendering) => set({ isRendering }),
   setRenderError: (renderError) => set({ renderError }),
+
+  // AI analysis state
+  isAnalyzing: false,
+  setIsAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
 
   // AI generation state
   taskId: null,

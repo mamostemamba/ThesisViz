@@ -1,6 +1,9 @@
 package sanitize
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
+)
 
 var (
 	defineColorRe  = regexp.MustCompile(`\\definecolor\{[^}]*\}\{[^}]*\}\{[^}]*\}\s*,?\s*\n?`)
@@ -16,6 +19,10 @@ var (
 	mboxRe      = regexp.MustCompile(`\\mbox\{([^}]*)\}`)
 	fontSizeRe  = regexp.MustCompile(`\\(?:footnotesize|scriptsize|tiny|small|large|Large|LARGE|huge|Huge|normalsize)\b\s*`)
 	tabularRe   = regexp.MustCompile(`\\begin\{tabular\}(?:\{[^}]*\})?([\s\S]*?)\\end\{tabular\}`)
+
+	// Matrix-of-nodes detection: ensure |[style]| syntax has proper matrix option.
+	matrixWithOptsRe    = regexp.MustCompile(`(\\matrix\s*(?:\([^)]*\)\s*)?\[)([^\]]*)(\])`)
+	matrixWithoutOptsRe = regexp.MustCompile(`(\\matrix\s*(?:\([^)]*\)\s*)?)(\{)`)
 )
 
 // stripTabularContent extracts plain text from a tabular body by removing
@@ -29,6 +36,47 @@ func stripTabularContent(body string) string {
 	// Collapse whitespace
 	s = regexp.MustCompile(`\s+`).ReplaceAllString(s, " ")
 	return s
+}
+
+// ensureMatrixOfNodes adds "matrix of nodes" option to \matrix commands
+// when the code contains |[style]| syntax (which requires it).
+func ensureMatrixOfNodes(code string) string {
+	if !strings.Contains(code, "|[") {
+		return code
+	}
+
+	// Case 1: \matrix[options] but missing "matrix of nodes"
+	code = matrixWithOptsRe.ReplaceAllStringFunc(code, func(match string) string {
+		subs := matrixWithOptsRe.FindStringSubmatch(match)
+		if len(subs) < 4 {
+			return match
+		}
+		if strings.Contains(subs[2], "matrix of nodes") {
+			return match
+		}
+		return subs[1] + "matrix of nodes, " + subs[2] + subs[3]
+	})
+
+	// Case 2: \matrix{ (no options at all) → insert [matrix of nodes]
+	code = matrixWithoutOptsRe.ReplaceAllStringFunc(code, func(match string) string {
+		subs := matrixWithoutOptsRe.FindStringSubmatch(match)
+		if len(subs) < 3 {
+			return match
+		}
+		return subs[1] + "[matrix of nodes] " + subs[2]
+	})
+
+	return code
+}
+
+// TikZClean performs minimal, safe cleanup: removes duplicate color definitions
+// and ensures matrix-of-nodes is present when |[style]| syntax is used.
+// Unlike TikZ(), it does NOT rewrite \textbf, \textit, etc.
+func TikZClean(code string) string {
+	code = defineColorRe.ReplaceAllString(code, "")
+	code = tikzDefColorRe.ReplaceAllString(code, "")
+	code = ensureMatrixOfNodes(code)
+	return code
 }
 
 // TikZ removes duplicate \definecolor, tikzpicture-option "define color" lines,
