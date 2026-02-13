@@ -30,9 +30,9 @@ const texTemplate = `\documentclass[border=20pt]{standalone}
         rectangle,
         rounded corners=3pt,
         align=center,
-        minimum height=0.9cm,
+        minimum height=1.0cm,
         minimum width=2.8cm,
-        inner sep=5pt,
+        inner sep=7pt,
         thick,
         font=\sffamily\small,
         drop shadow={opacity=0.08},
@@ -40,16 +40,16 @@ const texTemplate = `\documentclass[border=20pt]{standalone}
     %% Professional arrow with Stealth tip — for ALL connections
     nice_arrow/.style={
         ->,
-        >={Stealth[length=5pt, width=4pt]},
-        thick,
+        >={Stealth[length=6pt, width=5pt]},
+        line width=0.8pt,
         rounded corners=3pt,
         draw=black!70,
     },
     %% Bidirectional arrow
     nice_biarrow/.style={
         <->,
-        >={Stealth[length=5pt, width=4pt]},
-        thick,
+        >={Stealth[length=6pt, width=5pt]},
+        line width=0.8pt,
         rounded corners=3pt,
         draw=black!70,
     },

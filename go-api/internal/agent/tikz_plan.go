@@ -60,12 +60,24 @@ func sanitizeColor(c string) string {
 	return "primary"
 }
 
+// maxColumns returns the maximum number of nodes across all layers.
+func maxColumns(plan TikZPlan) int {
+	max := 0
+	for _, layer := range plan.Layers {
+		if len(layer.Nodes) > max {
+			max = len(layer.Nodes)
+		}
+	}
+	return max
+}
+
 // RenderTikZPlan converts a TikZPlan into TikZ code using strict \matrix layout.
 func RenderTikZPlan(plan TikZPlan) string {
 	if len(plan.Layers) == 0 {
 		return "\\begin{tikzpicture}\n\\node {Empty diagram};\n\\end{tikzpicture}"
 	}
 
+	maxCols := maxColumns(plan)
 	nodeMap := buildPlanNodeMap(plan)
 	rowSep, colSep := adaptiveSpacing(plan)
 
@@ -78,28 +90,23 @@ func RenderTikZPlan(plan TikZPlan) string {
 	b.WriteString(fmt.Sprintf("\\matrix (m) [\n  matrix of nodes,\n  row sep=%s,\n  column sep=%s,\n  nodes={matrix_node},\n] {\n", rowSep, colSep))
 
 	for i, layer := range plan.Layers {
-		writeMatrixRow(&b, layer)
-		if i < len(plan.Layers)-1 {
-			b.WriteString(" \\\\\n")
-		} else {
-			b.WriteString(" \\\\\n")
-		}
+		writeMatrixRow(&b, layer, maxCols)
+		b.WriteString(" \\\\\n")
+		_ = i
 	}
 	b.WriteString("};\n\n")
 
-	// --- Layer boxes (background) ---
+	// --- Layer boxes (background) — uniform width across all layers ---
 	b.WriteString("\\begin{pgfonlayer}{background}\n")
 	for i, layer := range plan.Layers {
 		if len(layer.Nodes) == 0 {
 			continue
 		}
 		row := i + 1
-		firstCol := 1
-		lastCol := len(layer.Nodes)
 		color := sanitizeColor(layer.Nodes[0].Color)
 		b.WriteString(fmt.Sprintf(
 			"  \\node[layer_box=%sLine, fit=(m-%d-%d)(m-%d-%d), label=above left:{\\sffamily\\normalsize\\bfseries %s}] {};\n",
-			color, row, firstCol, row, lastCol, escapeLaTeX(layer.Name),
+			color, row, 1, row, maxCols, escapeLaTeX(layer.Name),
 		))
 	}
 	b.WriteString("\\end{pgfonlayer}\n\n")
@@ -111,7 +118,7 @@ func RenderTikZPlan(plan TikZPlan) string {
 		if !okFrom || !okTo {
 			continue
 		}
-		b.WriteString(renderPlanEdge(fromPos, toPos, edge.Label, edge.Style))
+		b.WriteString(renderPlanEdge(fromPos, toPos, edge.Label, edge.Style, maxCols))
 		b.WriteString("\n")
 	}
 
@@ -172,19 +179,28 @@ func adaptiveSpacing(plan TikZPlan) (rowSep, colSep string) {
 }
 
 // writeMatrixRow writes one matrix row (one layer) to the builder.
-func writeMatrixRow(b *strings.Builder, layer PlanLayer) {
+// Pads shorter rows with invisible empty cells so all rows have maxCols columns.
+func writeMatrixRow(b *strings.Builder, layer PlanLayer, maxCols int) {
 	b.WriteString("  %% " + layer.Name + "\n")
-	for j, node := range layer.Nodes {
-		color := sanitizeColor(node.Color)
+	for j := 0; j < maxCols; j++ {
 		if j > 0 {
 			b.WriteString(" &\n")
 		}
-		b.WriteString(fmt.Sprintf("  |[fill=%sFill, draw=%sLine]| %s", color, color, escapeLaTeX(node.Label)))
+		if j < len(layer.Nodes) {
+			node := layer.Nodes[j]
+			color := sanitizeColor(node.Color)
+			b.WriteString(fmt.Sprintf("  |[fill=%sFill, draw=%sLine]| %s", color, color, escapeLaTeX(node.Label)))
+		} else {
+			// Invisible placeholder cell — maintains column alignment
+			b.WriteString("  |[draw=none, fill=none, drop shadow={opacity=0}]|")
+		}
 	}
 }
 
 // renderPlanEdge generates a \draw command for one edge with manhattan routing.
-func renderPlanEdge(from, to nodePos, label, style string) string {
+// For skip connections (spanning 2+ rows across columns), routes around the outside
+// of the diagram to avoid crossing intermediate nodes.
+func renderPlanEdge(from, to nodePos, label, style string, maxCols int) string {
 	arrowStyle := "nice_arrow"
 	if style == "biarrow" {
 		arrowStyle = "nice_biarrow"
@@ -194,19 +210,49 @@ func renderPlanEdge(from, to nodePos, label, style string) string {
 	toRef := fmt.Sprintf("m-%d-%d", to.Row, to.Col)
 
 	var path string
+	rowDiff := abs(from.Row - to.Row)
+
 	switch {
 	case from.Row == to.Row:
 		// Same row → straight horizontal
 		path = fmt.Sprintf("(%s) -- (%s)", fromRef, toRef)
+
 	case from.Col == to.Col:
 		// Same column → straight vertical
 		path = fmt.Sprintf("(%s) -- (%s)", fromRef, toRef)
-	case from.Row < to.Row:
-		// Going down, different column → manhattan routing
-		path = fmt.Sprintf("(%s.south) |- (%s.north)", fromRef, toRef)
+
+	case rowDiff == 1:
+		// Adjacent rows, different column → simple manhattan L-shape
+		if from.Row < to.Row {
+			path = fmt.Sprintf("(%s.south) |- (%s)", fromRef, toRef)
+		} else {
+			path = fmt.Sprintf("(%s.north) |- (%s)", fromRef, toRef)
+		}
+
 	default:
-		// Going up, different column → manhattan routing
-		path = fmt.Sprintf("(%s.north) |- (%s.south)", fromRef, toRef)
+		// Skip connection (2+ rows apart, different column)
+		// Route around the outside to avoid crossing intermediate nodes.
+		// Choose side: route via the closer edge (left or right).
+		avgCol := float64(from.Col+to.Col) / 2.0
+		midCol := float64(maxCols+1) / 2.0
+
+		if avgCol <= midCol {
+			// Route via left side
+			offset := "-1.2cm"
+			if from.Row < to.Row {
+				path = fmt.Sprintf("(%s.west) -- ++(%s,0) |- (%s.west)", fromRef, offset, toRef)
+			} else {
+				path = fmt.Sprintf("(%s.west) -- ++(%s,0) |- (%s.west)", fromRef, offset, toRef)
+			}
+		} else {
+			// Route via right side
+			offset := "1.2cm"
+			if from.Row < to.Row {
+				path = fmt.Sprintf("(%s.east) -- ++(%s,0) |- (%s.east)", fromRef, offset, toRef)
+			} else {
+				path = fmt.Sprintf("(%s.east) -- ++(%s,0) |- (%s.east)", fromRef, offset, toRef)
+			}
+		}
 	}
 
 	if label != "" {
@@ -214,6 +260,13 @@ func renderPlanEdge(from, to nodePos, label, style string) string {
 			arrowStyle, path, escapeLaTeX(label))
 	}
 	return fmt.Sprintf("\\draw[%s] %s;", arrowStyle, path)
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 // renderPlanAnnotation generates a brace annotation.
@@ -238,7 +291,7 @@ func renderPlanAnnotation(ann PlanAnnotation, nodeMap map[string]nodePos) string
 		anchor = "left=16pt"
 	}
 
-	return fmt.Sprintf("\\draw[%s] (%s.north) -- (%s.south) node[midway, %s] {%s};",
+	return fmt.Sprintf("\\draw[%s] (%s.north) -- (%s.south) node[midway, %s, font=\\sffamily\\small\\bfseries] {%s};",
 		braceStyle, firstRef, lastRef, anchor, escapeLaTeX(ann.Label))
 }
 
