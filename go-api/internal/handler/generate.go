@@ -79,6 +79,7 @@ type createRequest struct {
 	ThesisAbstract string                   `json:"thesis_abstract"`
 	Model          string                   `json:"model"`
 	Identity       string                   `json:"identity"`
+	Style          string                   `json:"style"`
 }
 
 // Create handles POST /api/v1/generate/create
@@ -121,6 +122,7 @@ func (h *GenerateHandler) Create(c *gin.Context) {
 			ThesisAbstract: req.ThesisAbstract,
 			Model:          req.Model,
 			Identity:       req.Identity,
+			Style:          req.Style,
 		}, pushFn)
 
 		if err != nil {

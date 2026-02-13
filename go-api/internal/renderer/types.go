@@ -11,6 +11,7 @@ type RenderOpts struct {
 	DPI      int    // default 300
 	Timeout  int    // seconds, default 60
 	Colors   string // TikZ color definitions or matplotlib palette
+	Style    string // "professional" (default) or "handdrawn"
 }
 
 type RenderResult struct {

@@ -38,6 +38,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
   const colorScheme = useSettingsStore((s) => s.colorScheme);
   const customColors = useSettingsStore((s) => s.customColors);
   const model = useSettingsStore((s) => s.model);
+  const diagramStyle = useSettingsStore((s) => s.diagramStyle);
 
   const taskId = useGenerateStore((s) => s.taskId);
   const phase = useGenerateStore((s) => s.phase);
@@ -156,6 +157,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
           thesis_abstract: thesisAbstract || undefined,
           model,
           identity: identity || undefined,
+          style: diagramStyle,
         });
 
         setTaskId(res.task_id);
@@ -220,6 +222,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
       thesisTitle,
       thesisAbstract,
       model,
+      diagramStyle,
       resetGeneration,
       setTaskId,
       setPhase,

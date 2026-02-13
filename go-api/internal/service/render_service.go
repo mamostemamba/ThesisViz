@@ -42,6 +42,7 @@ type RenderCodeRequest struct {
 	GenerationID string                   `json:"generation_id"`  // optional: update existing generation
 	DPI          int                      `json:"dpi"`
 	Timeout      int                      `json:"timeout"`
+	Style        string                   `json:"style"`          // "professional" (default) or "handdrawn"
 }
 
 type RenderCodeResponse struct {
@@ -68,6 +69,7 @@ func (s *RenderService) RenderCode(ctx context.Context, req RenderCodeRequest) (
 		Language: req.Language,
 		DPI:      req.DPI,
 		Timeout:  req.Timeout,
+		Style:    req.Style,
 	}
 
 	// Apply color scheme colors for TikZ — always include all drawio colors

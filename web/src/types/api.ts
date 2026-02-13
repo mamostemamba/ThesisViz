@@ -50,6 +50,7 @@ export interface RenderRequest {
   generation_id?: string;
   dpi?: number;
   timeout?: number;
+  style?: string;
 }
 
 export interface RenderResponse {
@@ -110,6 +111,7 @@ export interface GenerateCreateRequest {
   thesis_abstract?: string;
   model?: string;
   identity?: string;
+  style?: string;
 }
 
 export interface GenerateCreateResponse {

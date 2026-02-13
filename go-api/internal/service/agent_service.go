@@ -60,6 +60,7 @@ type GenerateRequest struct {
 	ThesisAbstract string
 	Model          string
 	Identity       string
+	Style          string // "professional" (default) or "handdrawn"
 }
 
 type RefineRequest struct {
@@ -258,7 +259,7 @@ func (s *AgentService) Generate(ctx context.Context, req GenerateRequest, pushFn
 	var fullTeX string
 	if req.Format == "tikz" {
 		colors := resolveColors(req.ColorScheme, req.CustomColors)
-		fullTeX = renderer.BuildFullTeX(code, colors, req.Language)
+		fullTeX = renderer.BuildFullTeX(code, colors, req.Language, req.Style)
 	}
 
 	result := &GenerateResult{
@@ -317,6 +318,7 @@ func (s *AgentService) compileWithRetries(
 			Language:     req.Language,
 			ColorScheme:  req.ColorScheme,
 			CustomColors: req.CustomColors,
+			Style:        req.Style,
 		})
 		if renderErr != nil || renderResp.Status == "error" {
 			errMsg := "unknown render error"
@@ -518,7 +520,7 @@ func (s *AgentService) visualReview(
 			Round: reroll, Code: newCode,
 		}})
 
-		rURL, rKey, rBytes, renderErr := s.renderAndGetBytes(ctx, newCode, req.Format, req.Language, req.ColorScheme, req.CustomColors)
+		rURL, rKey, rBytes, renderErr := s.renderAndGetBytes(ctx, newCode, req.Format, req.Language, req.ColorScheme, req.Style, req.CustomColors)
 		if renderErr != nil {
 			s.logger.Warn("reroll render failed", zap.Int("reroll", reroll), zap.Error(renderErr))
 			pushFn(ProgressMsg{Type: "preview", Phase: "rerolling", Data: ProgressData{
@@ -630,7 +632,7 @@ func (s *AgentService) visualReview(
 		code = newCode
 
 		// Re-render
-		fURL, fKey, fBytes, renderErr := s.renderAndGetBytes(ctx, code, req.Format, req.Language, req.ColorScheme, req.CustomColors)
+		fURL, fKey, fBytes, renderErr := s.renderAndGetBytes(ctx, code, req.Format, req.Language, req.ColorScheme, req.Style, req.CustomColors)
 		if renderErr != nil {
 			s.logger.Warn("fix render failed", zap.Int("fix", fix), zap.Error(renderErr))
 			pushFn(ProgressMsg{Type: "preview", Phase: "fixing", Data: ProgressData{
@@ -801,13 +803,14 @@ func (s *AgentService) markCancelled(gen *model.Generation) {
 }
 
 // renderAndGetBytes is a helper to render and also download the image bytes.
-func (s *AgentService) renderAndGetBytes(ctx context.Context, code, format, language, colorScheme string, customColors *colorscheme.CustomColors) (imageURL, imageKey string, imageBytes []byte, err error) {
+func (s *AgentService) renderAndGetBytes(ctx context.Context, code, format, language, colorScheme, style string, customColors *colorscheme.CustomColors) (imageURL, imageKey string, imageBytes []byte, err error) {
 	resp, err := s.renderSvc.RenderCode(ctx, RenderCodeRequest{
 		Code:         code,
 		Format:       format,
 		Language:     language,
 		ColorScheme:  colorScheme,
 		CustomColors: customColors,
+		Style:        style,
 	})
 	if err != nil {
 		return "", "", nil, err

@@ -142,6 +142,8 @@ export function Sidebar() {
   const setCustomColors = useSettingsStore((s) => s.setCustomColors);
   const model = useSettingsStore((s) => s.model);
   const setModel = useSettingsStore((s) => s.setModel);
+  const diagramStyle = useSettingsStore((s) => s.diagramStyle);
+  const setDiagramStyle = useSettingsStore((s) => s.setDiagramStyle);
   const isRendering = useGenerateStore((s) => s.isRendering);
   const isGenerating = useGenerateStore((s) => s.isGenerating);
   const isCancelled = useGenerateStore((s) => s.isCancelled);
@@ -501,6 +503,26 @@ export function Sidebar() {
           </Select>
         </div>
 
+        {format === "tikz" && (
+          <div>
+            <label className="mb-2 block text-sm font-medium">图表风格</label>
+            <Select
+              value={diagramStyle}
+              onValueChange={(v) =>
+                setDiagramStyle(v as "professional" | "handdrawn")
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="professional">专业 (Professional)</SelectItem>
+                <SelectItem value="handdrawn">手绘 (Hand-drawn)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <div>
           <label className="mb-2 block text-sm font-medium">状态</label>
           {generateError ? (
@@ -514,6 +536,7 @@ export function Sidebar() {
               )}
               {
                 {
+                  planning: "布局规划中",
                   generating: "代码生成中",
                   compiling: "编译渲染中",
                   reviewing: "视觉审查中",

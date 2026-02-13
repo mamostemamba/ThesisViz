@@ -121,6 +121,7 @@ export async function exportTeX(data: {
   language?: string;
   color_scheme?: string;
   custom_colors?: import("@/types/api").CustomColors;
+  style?: string;
 }) {
   return apiFetch<{ tex: string }>("/api/v1/export/tex", {
     method: "POST",

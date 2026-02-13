@@ -108,6 +108,11 @@ NODE TEXT CONCISENESS (important for readability):
 - Only add text width=Xcm on individual nodes that genuinely need line wrapping.
 - Standalone \node[...]{long text \\ second line}; may use \\ for line breaks. Matrix cells CANNOT.
 
+CHINESE VERTICAL SIDE LABELS (when label text is Chinese and placed on left/right side of diagram):
+- For side annotations or brace labels in Chinese, use rotate=90 to render vertically:
+  \node[rotate=90, anchor=south, font=\sffamily\small\bfseries] at (target.west) {中文标签};
+- This prevents Chinese text from being squeezed horizontally into a narrow side margin.
+
 === NODE TEXT RULES (prevent raw code leakage in rendered output) ===
 FORBIDDEN inside node text (especially matrix |[style]| cells):
 - \textbf{}, \textit{}, \underline{}, \emph{} → use {\bfseries text} or {\itshape text} instead

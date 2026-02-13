@@ -27,6 +27,7 @@ type renderRequest struct {
 	GenerationID string                   `json:"generation_id,omitempty"`
 	DPI          int                      `json:"dpi,omitempty"`
 	Timeout      int                      `json:"timeout,omitempty"`
+	Style        string                   `json:"style,omitempty"`
 }
 
 func (h *RenderHandler) Render(c *gin.Context) {
@@ -45,6 +46,7 @@ func (h *RenderHandler) Render(c *gin.Context) {
 		GenerationID: req.GenerationID,
 		DPI:          req.DPI,
 		Timeout:      req.Timeout,
+		Style:        req.Style,
 	}
 
 	resp, err := h.svc.RenderCode(c.Request.Context(), svcReq)
@@ -66,6 +68,7 @@ type exportTexRequest struct {
 	Language     string                   `json:"language,omitempty"`
 	ColorScheme  string                   `json:"color_scheme,omitempty"`
 	CustomColors *colorscheme.CustomColors `json:"custom_colors,omitempty"`
+	Style        string                   `json:"style,omitempty"`
 }
 
 // ExportTeX returns a complete .tex document ready for Overleaf.
@@ -82,7 +85,7 @@ func (h *RenderHandler) ExportTeX(c *gin.Context) {
 	} else {
 		colors = colorscheme.AllTikZColors(req.ColorScheme)
 	}
-	tex := renderer.BuildFullTeX(req.Code, colors, req.Language)
+	tex := renderer.BuildFullTeX(req.Code, colors, req.Language, req.Style)
 
 	c.JSON(http.StatusOK, gin.H{"tex": tex})
 }

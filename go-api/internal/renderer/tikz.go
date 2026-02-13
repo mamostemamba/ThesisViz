@@ -98,10 +98,33 @@ const texTemplate = `\documentclass[border=20pt]{standalone}
     %% Force all decoration lines to be thick enough for visual review
     every decoration/.style={very thick},
 }
-
+%s
 \begin{document}
 %s
 \end{document}
+`
+
+// handdrawnOverlay is injected after the main tikzset when style=="handdrawn".
+// It gives an Excalidraw-like hand-drawn feel to all shapes and connections.
+const handdrawnOverlay = `
+%% ---- Hand-drawn (Excalidraw-like) style overlay ----
+\tikzset{
+    handdrawn/.style={
+        decorate,
+        decoration={random steps, segment length=4pt, amplitude=0.4pt},
+    },
+    modern_box/.append style={handdrawn},
+    nice_arrow/.append style={
+        decorate,
+        decoration={random steps, segment length=5pt, amplitude=0.3pt},
+    },
+    nice_biarrow/.append style={
+        decorate,
+        decoration={random steps, segment length=5pt, amplitude=0.3pt},
+    },
+    layer_box/.append style={handdrawn},
+    container_box/.append style={handdrawn},
+}
 `
 
 type TikZRenderer struct{}
@@ -138,7 +161,11 @@ func (r *TikZRenderer) Render(ctx context.Context, code string, opts RenderOpts)
 	if lang == "zh" {
 		ctexLine = `\usepackage{ctex}`
 	}
-	texContent := fmt.Sprintf(texTemplate, ctexLine, colors, cleanCode)
+	styleBlock := ""
+	if opts.Style == "handdrawn" {
+		styleBlock = handdrawnOverlay
+	}
+	texContent := fmt.Sprintf(texTemplate, ctexLine, colors, styleBlock, cleanCode)
 
 	// Choose compiler
 	compiler := "pdflatex"
@@ -204,7 +231,7 @@ func (r *TikZRenderer) Render(ctx context.Context, code string, opts RenderOpts)
 }
 
 // BuildFullTeX returns the complete .tex source for a TikZ code snippet.
-func BuildFullTeX(tikzCode, colorDefs, language string) string {
+func BuildFullTeX(tikzCode, colorDefs, language, style string) string {
 	cleanCode := sanitize.TikZ(tikzCode)
 	ctexLine := ""
 	if strings.EqualFold(language, "zh") {
@@ -213,5 +240,9 @@ func BuildFullTeX(tikzCode, colorDefs, language string) string {
 	if colorDefs == "" {
 		colorDefs = defaultColors
 	}
-	return fmt.Sprintf(texTemplate, ctexLine, colorDefs, cleanCode)
+	styleBlock := ""
+	if style == "handdrawn" {
+		styleBlock = handdrawnOverlay
+	}
+	return fmt.Sprintf(texTemplate, ctexLine, colorDefs, styleBlock, cleanCode)
 }
