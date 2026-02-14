@@ -16,7 +16,7 @@ import (
 type Recommendation struct {
 	Title         string          `json:"title"`
 	Description   string          `json:"description"`
-	DrawingPrompt flexString      `json:"drawing_prompt"`
+	DrawingPrompt flexString      `json:"drawing_prompt,omitempty"`
 	Format        string          `json:"format,omitempty"`
 	Priority      int             `json:"priority"`
 	Identity      string          `json:"identity,omitempty"`
@@ -75,11 +75,11 @@ func NewRouterAgent(llm *llm.GeminiClient, logger *zap.Logger) *RouterAgent {
 	return &RouterAgent{llm: llm, logger: logger}
 }
 
-// Analyze examines thesis text and returns figure recommendations.
+// Analyze examines thesis text and returns lightweight figure recommendations (no drawing_prompt).
 func (a *RouterAgent) Analyze(ctx context.Context, text string, opts AgentOpts) ([]Recommendation, error) {
 	sysPrompt := prompt.Router(opts.Language, opts.ThesisTitle, opts.ThesisAbstract)
 
-	raw, err := a.llm.Generate(ctx, sysPrompt, text, defaultTemperature, opts.Model)
+	raw, err := a.llm.GenerateWithThinking(ctx, sysPrompt, text, defaultTemperature, thinkingBudget, opts.Model)
 	if err != nil {
 		return nil, fmt.Errorf("router analyze: %w", err)
 	}
@@ -108,7 +108,7 @@ func (a *RouterAgent) Analyze(ctx context.Context, text string, opts AgentOpts) 
 				return recs, nil
 			}
 		}
-		// The object might be a single recommendation (has "title" and "drawing_prompt")
+		// The object might be a single recommendation (has "title")
 		if _, hasTitle := wrapper["title"]; hasTitle {
 			var single Recommendation
 			if err := json.Unmarshal([]byte(jsonStr), &single); err == nil && single.Title != "" {
@@ -119,6 +119,39 @@ func (a *RouterAgent) Analyze(ctx context.Context, text string, opts AgentOpts) 
 	}
 
 	return nil, fmt.Errorf("router unmarshal: could not parse recommendations (json: %.500s)", jsonStr)
+}
+
+// GenerateDrawingPrompt generates a detailed drawing_prompt for a selected recommendation.
+// This is step 2: the user has chosen a figure, now we generate the full instructions.
+// colorPrompt describes the available color palette so instructions can assign colors to elements.
+func (a *RouterAgent) GenerateDrawingPrompt(ctx context.Context, text string, rec Recommendation, colorPrompt string, opts AgentOpts) (string, error) {
+	sysPrompt := prompt.RouterDrawingPrompt(opts.Language, opts.ThesisTitle, opts.ThesisAbstract, colorPrompt)
+
+	// Build user message with the selected figure info + original content
+	userMsg := fmt.Sprintf(`<figure>
+Identity: %s
+Title: %s
+Description: %s
+</figure>
+
+<data>
+%s
+</data>`, rec.Identity, rec.Title, string(rec.Description), text)
+
+	raw, err := a.llm.GenerateWithThinking(ctx, sysPrompt, userMsg, defaultTemperature, thinkingBudget, opts.Model)
+	if err != nil {
+		return "", fmt.Errorf("router drawing prompt: %w", err)
+	}
+
+	a.logger.Debug("drawing prompt raw response", zap.String("raw", truncate(raw, 2000)))
+
+	// The response should be plain text (not JSON), just clean it up
+	result := strings.TrimSpace(raw)
+	if result == "" {
+		return "", fmt.Errorf("router drawing prompt: empty response")
+	}
+
+	return result, nil
 }
 
 // truncate returns at most maxLen characters of s.

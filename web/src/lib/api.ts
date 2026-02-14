@@ -9,6 +9,8 @@ import type {
   CreateGenerationRequest,
   AnalyzeRequest,
   AnalyzeResponse,
+  DrawingPromptRequest,
+  DrawingPromptResponse,
   GenerateCreateRequest,
   GenerateCreateResponse,
   GenerateRefineRequest,
@@ -132,6 +134,13 @@ export async function exportTeX(data: {
 // AI Generate
 export async function analyzeText(data: AnalyzeRequest) {
   return apiFetch<AnalyzeResponse>("/api/v1/generate/analyze", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function generateDrawingPrompt(data: DrawingPromptRequest) {
+  return apiFetch<DrawingPromptResponse>("/api/v1/generate/drawing-prompt", {
     method: "POST",
     body: JSON.stringify(data),
   });

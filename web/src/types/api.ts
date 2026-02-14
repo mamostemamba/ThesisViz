@@ -90,10 +90,27 @@ export interface AnalyzeRequest {
 export interface Recommendation {
   title: string;
   description: string;
-  drawing_prompt: string;
+  drawing_prompt?: string;
   format?: string;
   priority: number;
   identity?: string;
+}
+
+export interface DrawingPromptRequest {
+  text: string;
+  title: string;
+  description: string;
+  identity?: string;
+  language?: string;
+  thesis_title?: string;
+  thesis_abstract?: string;
+  model?: string;
+  color_scheme?: string;
+  custom_colors?: CustomColors;
+}
+
+export interface DrawingPromptResponse {
+  drawing_prompt: string;
 }
 
 export interface AnalyzeResponse {

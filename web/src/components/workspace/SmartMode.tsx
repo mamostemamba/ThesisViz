@@ -16,7 +16,7 @@ import { useAnalyze, useGenerateCreate } from "@/lib/queries";
 import { connectGeneration, type WSMessage } from "@/lib/ws";
 import { ProgressStream, collectImageSnapshots } from "./ProgressStream";
 import { ResultPanel } from "./ResultPanel";
-import { generateCreate, cancelGeneration } from "@/lib/api";
+import { generateCreate, cancelGeneration, generateDrawingPrompt } from "@/lib/api";
 import { Search, Sparkles, Loader2, StopCircle } from "lucide-react";
 import type { Recommendation } from "@/types/api";
 
@@ -31,6 +31,7 @@ export function SmartMode({ projectId }: SmartModeProps) {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
   const [editingPrompt, setEditingPrompt] = useState<string | null>(null);
+  const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
   const [parentCode, setParentCode] = useState<string | undefined>(undefined);
 
   const language = useSettingsStore((s) => s.language);
@@ -302,9 +303,31 @@ export function SmartMode({ projectId }: SmartModeProps) {
                     ? "border-primary bg-primary/5"
                     : "hover:border-muted-foreground/30"
                 }`}
-                onClick={() => {
+                onClick={async () => {
                   setSelectedRec(rec);
-                  setEditingPrompt(rec.drawing_prompt);
+                  setEditingPrompt(null);
+                  setIsLoadingPrompt(true);
+                  try {
+                    const res = await generateDrawingPrompt({
+                      text,
+                      title: rec.title,
+                      description: rec.description,
+                      identity: rec.identity,
+                      language,
+                      thesis_title: thesisTitle || undefined,
+                      thesis_abstract: thesisAbstract || undefined,
+                      model,
+                      color_scheme: colorScheme,
+                      custom_colors: colorScheme === "custom" && customColors ? customColors : undefined,
+                    });
+                    setEditingPrompt(res.drawing_prompt);
+                  } catch (err) {
+                    setEditingPrompt(
+                      `[生成画图指令失败: ${err instanceof Error ? err.message : "未知错误"}]`
+                    );
+                  } finally {
+                    setIsLoadingPrompt(false);
+                  }
                 }}
               >
                 <CardContent className="p-3 space-y-1">
@@ -325,48 +348,57 @@ export function SmartMode({ projectId }: SmartModeProps) {
       )}
 
       {/* Step 3: Prompt editing */}
-      {editingPrompt !== null && selectedRec && (
+      {selectedRec && (isLoadingPrompt || editingPrompt !== null) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">画图提示词（可编辑）</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Textarea
-              value={editingPrompt}
-              onChange={(e) => setEditingPrompt(e.target.value)}
-              className="min-h-[120px] text-sm"
-            />
-            <div className="flex gap-2">
-              <Button
-                onClick={() =>
-                  startGeneration(
-                    editingPrompt,
-                    selectedRec.format || format,
-                    false,
-                    selectedRec.identity
-                  )
-                }
-                disabled={!editingPrompt.trim() || isGenerating}
-                className="flex-1"
-              >
-                {isGenerating ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
-                )}
-                {isGenerating ? "生成中..." : "确认生成"}
-              </Button>
-              {isGenerating && (
-                <Button
-                  variant="destructive"
-                  onClick={handleCancel}
-                  className="shrink-0"
-                >
-                  <StopCircle className="mr-2 h-4 w-4" />
-                  终止
-                </Button>
-              )}
-            </div>
+            {isLoadingPrompt ? (
+              <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm">正在生成画图指令...</span>
+              </div>
+            ) : (
+              <>
+                <Textarea
+                  value={editingPrompt || ""}
+                  onChange={(e) => setEditingPrompt(e.target.value)}
+                  className="min-h-[120px] text-sm"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() =>
+                      startGeneration(
+                        editingPrompt || "",
+                        selectedRec.format || format,
+                        false,
+                        selectedRec.identity
+                      )
+                    }
+                    disabled={!editingPrompt?.trim() || isGenerating}
+                    className="flex-1"
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-2 h-4 w-4" />
+                    )}
+                    {isGenerating ? "生成中..." : "确认生成"}
+                  </Button>
+                  {isGenerating && (
+                    <Button
+                      variant="destructive"
+                      onClick={handleCancel}
+                      className="shrink-0"
+                    >
+                      <StopCircle className="mr-2 h-4 w-4" />
+                      终止
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

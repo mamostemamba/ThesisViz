@@ -68,6 +68,51 @@ func (h *GenerateHandler) Analyze(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"recommendations": recs})
 }
 
+type drawingPromptRequest struct {
+	Text           string                   `json:"text" binding:"required"`
+	Title          string                   `json:"title" binding:"required"`
+	Description    string                   `json:"description" binding:"required"`
+	Identity       string                   `json:"identity"`
+	Language       string                   `json:"language"`
+	ThesisTitle    string                   `json:"thesis_title"`
+	ThesisAbstract string                   `json:"thesis_abstract"`
+	Model          string                   `json:"model"`
+	ColorScheme    string                   `json:"color_scheme"`
+	CustomColors   *colorscheme.CustomColors `json:"custom_colors,omitempty"`
+}
+
+// DrawingPrompt handles POST /api/v1/generate/drawing-prompt
+func (h *GenerateHandler) DrawingPrompt(c *gin.Context) {
+	var req drawingPromptRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Language == "" {
+		req.Language = defaultLanguage
+	}
+
+	drawingPrompt, err := h.agentSvc.GenerateDrawingPrompt(c.Request.Context(), service.DrawingPromptRequest{
+		Text:           req.Text,
+		Title:          req.Title,
+		Description:    req.Description,
+		Identity:       req.Identity,
+		Language:       req.Language,
+		ThesisTitle:    req.ThesisTitle,
+		ThesisAbstract: req.ThesisAbstract,
+		Model:          req.Model,
+		ColorScheme:    req.ColorScheme,
+		CustomColors:   req.CustomColors,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"drawing_prompt": drawingPrompt})
+}
+
 type createRequest struct {
 	ProjectID      string                   `json:"project_id"`
 	Format         string                   `json:"format" binding:"required"`

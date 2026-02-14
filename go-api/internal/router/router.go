@@ -67,6 +67,7 @@ func Setup(deps Deps) *gin.Engine {
 		// Generate (AI pipeline)
 		if deps.GenerateHandler != nil {
 			v1.POST("/generate/analyze", deps.GenerateHandler.Analyze)
+			v1.POST("/generate/drawing-prompt", deps.GenerateHandler.DrawingPrompt)
 			v1.POST("/generate/create", deps.GenerateHandler.Create)
 			v1.POST("/generate/refine", deps.GenerateHandler.Refine)
 			v1.POST("/generate/cancel/:taskId", deps.GenerateHandler.Cancel)

@@ -145,6 +145,38 @@ func (c *GeminiClient) GenerateWithImage(ctx context.Context, systemPrompt, user
 	return text, nil
 }
 
+// GenerateWithThinking calls the model with thinking mode enabled.
+// thinkingBudget controls the maximum thinking tokens (0 = model default, typically 8192).
+func (c *GeminiClient) GenerateWithThinking(ctx context.Context, systemPrompt, userMsg string, temp float32, thinkingBudget int32, modelOverrides ...string) (string, error) {
+	var override string
+	if len(modelOverrides) > 0 {
+		override = modelOverrides[0]
+	}
+
+	config := &genai.GenerateContentConfig{
+		Temperature: genai.Ptr(temp),
+		SystemInstruction: &genai.Content{
+			Parts: []*genai.Part{genai.NewPartFromText(systemPrompt)},
+		},
+		ThinkingConfig: &genai.ThinkingConfig{
+			ThinkingBudget: genai.Ptr(thinkingBudget),
+		},
+	}
+
+	resp, err := c.generateWithRetry(ctx, c.resolveModel(override), []*genai.Content{
+		{
+			Role:  "user",
+			Parts: []*genai.Part{genai.NewPartFromText(userMsg)},
+		},
+	}, config)
+	if err != nil {
+		return "", fmt.Errorf("gemini generate with thinking: %w", err)
+	}
+
+	text := resp.Text()
+	return text, nil
+}
+
 // ReviewImage calls the model with lower temperature for visual quality review.
 func (c *GeminiClient) ReviewImage(ctx context.Context, systemPrompt, userMsg string, img []byte, modelOverrides ...string) (string, error) {
 	return c.GenerateWithImage(ctx, systemPrompt, userMsg, img, 0.2, modelOverrides...)

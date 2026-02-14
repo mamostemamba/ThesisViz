@@ -2,78 +2,127 @@ package prompt
 
 import "fmt"
 
-// Router returns the system prompt for the text-analysis router agent.
+// Router returns the system prompt for the text-analysis router agent (step 1).
+// It recommends 1-3 figure types WITHOUT generating drawing_prompt.
 func Router(language, thesisTitle, thesisAbstract string) string {
 	langLabel := "English"
+	langConstraints := `- Use English.
+- Do not use obscure or abstract jargon.
+- Do not use exaggerated words.
+- Must be fluent and logical.`
 	if language == "zh" {
 		langLabel = "Chinese"
-	}
-	identityBlock := ""
-	if thesisTitle != "" || thesisAbstract != "" {
-		identityBlock = fmt.Sprintf("\nContext about the thesis:\n- Title: %s\n- Abstract: %s\n", thesisTitle, thesisAbstract)
-	}
-
-	zhConstraint := ""
-	if language == "zh" {
-		zhConstraint = `
-Chinese language constraints for drawing_prompt:
-- 使用简体中文撰写
+		langConstraints = `- 使用简体中文
 - 不要使用引号
 - 不要使用括号补充英语内容
-- 不要使用夸大词语或难懂抽象词语
-- 描述需要流畅、有逻辑
-`
+- 不要使用各种难懂抽象的词语
+- 不要使用夸大词语
+- 需要流畅，有逻辑`
 	}
 
-	return fmt.Sprintf(`You are an academic figure planning assistant.%s
+	thesisBlock := ""
+	if thesisTitle != "" || thesisAbstract != "" {
+		thesisBlock = "\n<thesis>\n"
+		if thesisTitle != "" {
+			thesisBlock += fmt.Sprintf("Title: %s\n", thesisTitle)
+		}
+		if thesisAbstract != "" {
+			thesisBlock += fmt.Sprintf("Abstract: %s\n", thesisAbstract)
+		}
+		thesisBlock += "</thesis>\n"
+	}
 
-=== Step 0 — Domain Identification ===
-First, identify the academic domain of the given text (e.g., blockchain, cryptography,
-integrated circuits, NLP, computer vision, distributed systems, etc.). Then adopt the
-identity of a senior expert in that domain. For example, if the text is about blockchain
-and IoT security, your identity would be: "资深区块链与物联网安全学术专家，精通密码学和工程实践".
-This domain expertise should guide your understanding of the text and inform the
-specificity and accuracy of your drawing recommendations.
+	return fmt.Sprintf(`<constraints>
+%s
+</constraints>
 
-Given a piece of thesis text, analyze what kinds of figures would best illustrate the content.
+<task>
+- First, read the content in <data> carefully. Identify the academic domain and adopt the identity of a senior expert in that field.
+- If <thesis> is provided, also read the thesis title and abstract to understand the broader context.
+- Recommend EXACTLY 3 different figures that could illustrate the content from different angles.
+  Think about: architecture/structure diagrams, flow/process diagrams, comparison/relationship diagrams, data flow diagrams, etc.
+  Each figure should have a distinct purpose — do NOT recommend variations of the same figure.
+- Output a JSON array with exactly 3 elements (no markdown fences, no extra text). Each element:
+  {"identity": "...", "title": "...", "description": "...", "priority": 1}
 
-Return a JSON array of recommendations. Each item has:
-- "identity": a short %s string describing the domain expert identity you adopted for this analysis (e.g. "资深区块链与物联网安全学术专家" or "Senior NLP and deep learning researcher"). This will be passed to the code-generation agent.
-- "title": short %s title for the recommended figure
-- "description": one-sentence %s explanation of what the figure would show
-- "drawing_prompt": a SINGLE flat %s string (NOT a nested object). This prompt will be directly sent to a code-generation agent, so be EXHAUSTIVELY specific and detailed — think of it as a complete design specification. It MUST contain the following 4 sections, separated by newlines within the string:
+  - "identity": your adopted expert identity (e.g. "区块链安全研究员", "AI系统架构师")
+  - "title": short figure title (e.g. "系统整体架构图", "训练流程图")
+  - "description": 1-2 sentence %s description of what this figure should show and why it helps the reader
+  - "priority": 1 = most recommended, 2 = second, 3 = third
 
-  Section 1 - Design Intent (2-3 sentences):
-    State what information this figure aims to convey, why it is important in the context of the thesis, and what the reader should take away from it.
+Do NOT include a "drawing_prompt" field. That will be generated in a separate step.
+You MUST output exactly 3 recommendations in the JSON array.
+</task>
+%s`, langConstraints, langLabel, thesisBlock)
+}
 
-  Section 2 - Overall Layout (IMPORTANT — organize into rows and columns):
-    - Figure type (e.g. vertical swimlane diagram, flowchart, grouped bar chart, pie chart)
-    - Direction (top-to-bottom, left-to-right, etc.)
-    - EXPLICIT row/column structure: state how many rows and columns, and which elements go in which row
-      Example: "Row 1 (input layer): Data Source A, Data Source B, Data Source C. Row 2 (processing): Encoder, Transformer. Row 3 (output): Classifier, Output."
-    - Width control hint (e.g. compact 3-column design, max 4 columns per row)
+// RouterDrawingPrompt returns the system prompt for generating a detailed drawing_prompt (step 2).
+// Called after the user selects a recommended figure.
+// colorDefs is the full \definecolor block with hex values, so the LLM can read actual colors.
+func RouterDrawingPrompt(language, thesisTitle, thesisAbstract, colorDefs string) string {
+	langLabel := "English"
+	langConstraints := `- Use English.
+- Do not use obscure or abstract jargon.
+- Do not use exaggerated words.
+- The drawing instructions must be extremely detailed.
+- Must be fluent and logical.
+- The figure should not be designed too wide.`
+	if language == "zh" {
+		langLabel = "Chinese"
+		langConstraints = `- 使用简体中文
+- 不要使用引号
+- 不要使用括号补充英语内容
+- 不要使用各种难懂抽象的词语
+- 不要使用夸大词语
+- 需要非常详细的画图指令
+- 需要流畅，有逻辑
+- 图不要设计的太宽`
+	}
 
-  Section 3 - Drawing Steps (the core — be exhaustive and precise):
-    Number each step. For each step specify:
-    - The element to draw (node, box, arrow, label, bracket, etc.)
-    - Exact label text for every node and edge (use domain-accurate terminology)
-    - Size/proportion hints (e.g. this block should occupy about 60%% of the lane height)
-    - Color emphasis hints (e.g. use a darker shade to highlight this is the most time-consuming step)
-    - Spatial relationships (e.g. below the previous block, arrow pointing from X to Y)
-    - Connection logic: explain WHY each arrow exists (e.g. "arrow from A to B because A's output feeds into B")
-    - Key data points, percentages, or values from the thesis text
+	thesisBlock := ""
+	if thesisTitle != "" || thesisAbstract != "" {
+		thesisBlock = "\n<thesis>\n"
+		if thesisTitle != "" {
+			thesisBlock += fmt.Sprintf("Title: %s\n", thesisTitle)
+		}
+		if thesisAbstract != "" {
+			thesisBlock += fmt.Sprintf("Abstract: %s\n", thesisAbstract)
+		}
+		thesisBlock += "</thesis>\n"
+	}
 
-  Section 4 - Summary Annotations:
-    - Any overall summary labels (e.g. a brace covering steps 2-4 with total time annotation)
-    - Key takeaway callouts
-    - Legend or notation explanations if needed
+	return fmt.Sprintf(`<constraints>
+%s
+</constraints>
 
-- "priority": integer 1-3 (1 = most recommended)
+<palette>
+%s
+</palette>
 
-Rules:
-- Return between 1 and 3 recommendations.
-- Focus on WHAT to draw, not HOW (the user will choose the rendering format).
-- The drawing_prompt must read like a complete design specification — fluent, logical, and detailed enough that a code agent can produce the figure without seeing the original text.
-- Output ONLY the JSON array, no markdown fences, no extra text.
-%s`, identityBlock, langLabel, langLabel, langLabel, langLabel, zhConstraint)
+<task>
+You are given a figure recommendation (title + description) and the original content in <data>.
+If <thesis> is provided, also read the thesis title and abstract to understand the broader context.
+Adopt the expert identity specified in <figure>.
+
+Your sole task: generate extremely detailed %s drawing instructions for the specified figure.
+
+Output ONLY the drawing instructions as plain text (NOT JSON, NOT markdown). Write as flowing prose with multiple paragraphs.
+
+CRITICAL REQUIREMENTS:
+- At least 500 words, ideally 800+.
+- Describe every visual element: nodes, boxes, arrows, labels, groupings, layers.
+- Specify spatial relationships: what is above/below/left/right of what.
+- Describe connection logic: which arrows connect which elements, direction, labels on arrows.
+- Include all label text that should appear in the figure.
+- Describe the overall layout structure: top-to-bottom flow, left-to-right pipeline, layered architecture, etc.
+- The code-generation agent will ONLY see your text — nothing else. So nothing can be omitted.
+- Do NOT compress or summarize. Be exhaustive and thorough.
+
+COLOR ASSIGNMENT:
+Read <palette> above — those are hex color definitions. Understand what actual colors they represent (blues, greens, oranges, purples, reds, greys, etc.).
+For each visual element, state what color to use in plain language.
+Example: "编码器模块使用蓝色填充，解码器模块使用绿色填充，注意力层使用橙色填充，输出层使用紫色填充，背景容器使用灰色。"
+Use plain color words (蓝色, 绿色, 橙色, 紫色, 红色, 灰色 / blue, green, orange, purple, red, grey). Do NOT use technical names like primaryFill or secondaryLine.
+</task>
+%s`, langConstraints, colorDefs, langLabel, thesisBlock)
 }

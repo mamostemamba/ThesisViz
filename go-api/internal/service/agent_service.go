@@ -80,6 +80,19 @@ type AnalyzeRequest struct {
 	Model          string
 }
 
+type DrawingPromptRequest struct {
+	Text           string
+	Title          string
+	Description    string
+	Identity       string
+	Language       string
+	ThesisTitle    string
+	ThesisAbstract string
+	Model          string
+	ColorScheme    string
+	CustomColors   *colorscheme.CustomColors
+}
+
 type GenerateResult struct {
 	GenerationID string
 	Code         string
@@ -121,7 +134,7 @@ func NewAgentService(
 	}
 }
 
-// Analyze runs the router agent to recommend figures from thesis text.
+// Analyze runs the router agent to recommend figures from thesis text (step 1).
 func (s *AgentService) Analyze(ctx context.Context, req AnalyzeRequest) ([]agent.Recommendation, error) {
 	opts := agent.AgentOpts{
 		Language:       req.Language,
@@ -130,6 +143,34 @@ func (s *AgentService) Analyze(ctx context.Context, req AnalyzeRequest) ([]agent
 		Model:          req.Model,
 	}
 	return s.router.Analyze(ctx, req.Text, opts)
+}
+
+// GenerateDrawingPrompt generates a detailed drawing_prompt for a selected recommendation (step 2).
+func (s *AgentService) GenerateDrawingPrompt(ctx context.Context, req DrawingPromptRequest) (string, error) {
+	// Resolve full color definitions (with hex values) so the LLM can read actual colors
+	var colorDefs string
+	if req.CustomColors != nil {
+		colorDefs = colorscheme.AllTikZColorsCustom(*req.CustomColors)
+	} else {
+		cs := req.ColorScheme
+		if cs == "" {
+			cs = "drawio"
+		}
+		colorDefs = colorscheme.AllTikZColors(cs)
+	}
+
+	opts := agent.AgentOpts{
+		Language:       req.Language,
+		ThesisTitle:    req.ThesisTitle,
+		ThesisAbstract: req.ThesisAbstract,
+		Model:          req.Model,
+	}
+	rec := agent.Recommendation{
+		Title:       req.Title,
+		Description: req.Description,
+		Identity:    req.Identity,
+	}
+	return s.router.GenerateDrawingPrompt(ctx, req.Text, rec, colorDefs, opts)
 }
 
 // resolveColors returns the TikZ color definition block for the given scheme.
