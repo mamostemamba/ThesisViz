@@ -170,6 +170,20 @@ export async function getGenerationDetail(id: string) {
   return apiFetch<Generation>(`/api/v1/generate/${id}`);
 }
 
+// Config
+export async function configureApiKey(apiKey: string) {
+  return apiFetch<{ status: string }>("/api/v1/config/api-key", {
+    method: "POST",
+    body: JSON.stringify({ api_key: apiKey }),
+  });
+}
+
+export async function getConfigStatus() {
+  return apiFetch<{ has_api_key: boolean; model: string }>(
+    "/api/v1/config/status"
+  );
+}
+
 // Color extraction
 export async function extractColors(file: File): Promise<ExtractColorsResponse> {
   const formData = new FormData();

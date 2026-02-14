@@ -1,5 +1,10 @@
 .PHONY: infra infra-down api render render-setup web dev
 
+# Proxy for accessing Google API (comment out if not needed)
+export https_proxy := http://127.0.0.1:7897
+export http_proxy  := http://127.0.0.1:7897
+export all_proxy   := socks5://127.0.0.1:7897
+
 # Start Docker infrastructure (PostgreSQL, Redis, MinIO)
 infra:
 	docker compose up -d

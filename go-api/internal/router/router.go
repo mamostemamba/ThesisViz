@@ -21,6 +21,7 @@ type Deps struct {
 	GenerateHandler     *handler.GenerateHandler
 	ColorExtractHandler *handler.ColorExtractHandler
 	WSHandler           *handler.WSHandler
+	ConfigHandler       *handler.ConfigHandler
 }
 
 func Setup(deps Deps) *gin.Engine {
@@ -30,7 +31,7 @@ func Setup(deps Deps) *gin.Engine {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:3001"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-API-Key"},
 		AllowCredentials: true,
 	}))
 
@@ -65,24 +66,22 @@ func Setup(deps Deps) *gin.Engine {
 		}
 
 		// Generate (AI pipeline)
-		if deps.GenerateHandler != nil {
-			v1.POST("/generate/analyze", deps.GenerateHandler.Analyze)
-			v1.POST("/generate/drawing-prompt", deps.GenerateHandler.DrawingPrompt)
-			v1.POST("/generate/create", deps.GenerateHandler.Create)
-			v1.POST("/generate/refine", deps.GenerateHandler.Refine)
-			v1.POST("/generate/cancel/:taskId", deps.GenerateHandler.Cancel)
-			v1.GET("/generate/:id", deps.GenerateHandler.Get)
-		}
+		v1.POST("/generate/analyze", deps.GenerateHandler.Analyze)
+		v1.POST("/generate/drawing-prompt", deps.GenerateHandler.DrawingPrompt)
+		v1.POST("/generate/create", deps.GenerateHandler.Create)
+		v1.POST("/generate/refine", deps.GenerateHandler.Refine)
+		v1.POST("/generate/cancel/:taskId", deps.GenerateHandler.Cancel)
+		v1.GET("/generate/:id", deps.GenerateHandler.Get)
 
 		// Color extraction
-		if deps.ColorExtractHandler != nil {
-			v1.POST("/colors/extract", deps.ColorExtractHandler.Extract)
-		}
+		v1.POST("/colors/extract", deps.ColorExtractHandler.Extract)
 
 		// WebSocket
-		if deps.WSHandler != nil {
-			v1.GET("/ws/generate/:taskId", deps.WSHandler.HandleGenerate)
-		}
+		v1.GET("/ws/generate/:taskId", deps.WSHandler.HandleGenerate)
+
+		// Config
+		v1.POST("/config/api-key", deps.ConfigHandler.SetAPIKey)
+		v1.GET("/config/status", deps.ConfigHandler.Status)
 	}
 
 	return r

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"github.com/thesisviz/go-api/internal/llm"
 	"github.com/thesisviz/go-api/internal/service"
 	"github.com/thesisviz/go-api/internal/storage"
 	"github.com/thesisviz/go-api/internal/ws"
@@ -27,10 +28,19 @@ type GenerateHandler struct {
 	storage  *storage.MinIOStorage
 	hub      *ws.Hub
 	logger   *zap.Logger
+	gemini   *llm.GeminiClient
 }
 
-func NewGenerateHandler(agentSvc *service.AgentService, genSvc *service.GenerationService, store *storage.MinIOStorage, hub *ws.Hub, logger *zap.Logger) *GenerateHandler {
-	return &GenerateHandler{agentSvc: agentSvc, genSvc: genSvc, storage: store, hub: hub, logger: logger}
+func NewGenerateHandler(agentSvc *service.AgentService, genSvc *service.GenerationService, store *storage.MinIOStorage, hub *ws.Hub, logger *zap.Logger, gemini *llm.GeminiClient) *GenerateHandler {
+	return &GenerateHandler{agentSvc: agentSvc, genSvc: genSvc, storage: store, hub: hub, logger: logger, gemini: gemini}
+}
+
+func (h *GenerateHandler) requireKey(c *gin.Context) bool {
+	if !h.gemini.HasKey() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "请先配置 API Key"})
+		return false
+	}
+	return true
 }
 
 type analyzeRequest struct {
@@ -43,6 +53,9 @@ type analyzeRequest struct {
 
 // Analyze handles POST /api/v1/generate/analyze
 func (h *GenerateHandler) Analyze(c *gin.Context) {
+	if !h.requireKey(c) {
+		return
+	}
 	var req analyzeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -83,6 +96,9 @@ type drawingPromptRequest struct {
 
 // DrawingPrompt handles POST /api/v1/generate/drawing-prompt
 func (h *GenerateHandler) DrawingPrompt(c *gin.Context) {
+	if !h.requireKey(c) {
+		return
+	}
 	var req drawingPromptRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -129,6 +145,9 @@ type createRequest struct {
 
 // Create handles POST /api/v1/generate/create
 func (h *GenerateHandler) Create(c *gin.Context) {
+	if !h.requireKey(c) {
+		return
+	}
 	var req createRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -197,6 +216,9 @@ type refineRequestBody struct {
 
 // Refine handles POST /api/v1/generate/refine
 func (h *GenerateHandler) Refine(c *gin.Context) {
+	if !h.requireKey(c) {
+		return
+	}
 	var req refineRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

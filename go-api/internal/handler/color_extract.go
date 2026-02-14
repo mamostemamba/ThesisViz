@@ -35,6 +35,10 @@ func validHex(s string) bool {
 
 // Extract handles POST /api/v1/colors/extract
 func (h *ColorExtractHandler) Extract(c *gin.Context) {
+	if !h.llm.HasKey() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "请先配置 API Key"})
+		return
+	}
 	file, header, err := c.Request.FormFile("image")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing image file"})

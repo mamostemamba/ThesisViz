@@ -7,27 +7,60 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/genai"
 )
 
+// ErrNoAPIKey is returned when an operation requires an API key but none is set.
+var ErrNoAPIKey = errors.New("API key not configured")
+
 // GeminiClient wraps the Gemini SDK for text and multimodal generation.
 type GeminiClient struct {
+	mu     sync.RWMutex
 	client *genai.Client
 	model  string
 }
 
 // NewGeminiClient creates a new Gemini API client.
+// If apiKey is empty, the client is created without a backend connection;
+// call SetAPIKey later to activate it.
 func NewGeminiClient(ctx context.Context, apiKey, model string) (*GeminiClient, error) {
+	gc := &GeminiClient{model: model}
+	if apiKey != "" {
+		client, err := genai.NewClient(ctx, &genai.ClientConfig{
+			APIKey:  apiKey,
+			Backend: genai.BackendGeminiAPI,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create gemini client: %w", err)
+		}
+		gc.client = client
+	}
+	return gc, nil
+}
+
+// SetAPIKey (re)creates the internal genai.Client with the given key.
+func (c *GeminiClient) SetAPIKey(ctx context.Context, apiKey string) error {
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  apiKey,
 		Backend: genai.BackendGeminiAPI,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("create gemini client: %w", err)
+		return fmt.Errorf("create gemini client: %w", err)
 	}
-	return &GeminiClient{client: client, model: model}, nil
+	c.mu.Lock()
+	c.client = client
+	c.mu.Unlock()
+	return nil
+}
+
+// HasKey reports whether the client has a usable API key configured.
+func (c *GeminiClient) HasKey() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.client != nil
 }
 
 // resolveModel returns the override model if non-empty, otherwise the default.
@@ -64,6 +97,13 @@ func isTransient(err error) bool {
 
 // generateWithRetry wraps GenerateContent with retries for transient errors.
 func (c *GeminiClient) generateWithRetry(ctx context.Context, model string, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
+	c.mu.RLock()
+	client := c.client
+	c.mu.RUnlock()
+	if client == nil {
+		return nil, ErrNoAPIKey
+	}
+
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
@@ -74,7 +114,7 @@ func (c *GeminiClient) generateWithRetry(ctx context.Context, model string, cont
 			case <-time.After(delay):
 			}
 		}
-		resp, err := c.client.Models.GenerateContent(ctx, model, contents, config)
+		resp, err := client.Models.GenerateContent(ctx, model, contents, config)
 		if err == nil {
 			return resp, nil
 		}

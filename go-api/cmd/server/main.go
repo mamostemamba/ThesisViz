@@ -95,46 +95,44 @@ func main() {
 	generationHandler := handler.NewGenerationHandler(generationSvc, store)
 	renderHandler := handler.NewRenderHandler(renderSvc)
 
-	// LLM + Agents (optional — only if GEMINI_API_KEY is set)
-	var generateHandler *handler.GenerateHandler
-	var colorExtractHandler *handler.ColorExtractHandler
-	var wsHandler *handler.WSHandler
-
-	if cfg.GeminiAPIKey != "" {
-		geminiClient, err := llm.NewGeminiClient(context.Background(), cfg.GeminiAPIKey, cfg.GeminiModel)
-		if err != nil {
-			logger.Fatal("failed to create gemini client", zap.Error(err))
-		}
-		logger.Info("gemini client ready", zap.String("model", cfg.GeminiModel))
-
-		agents := map[string]agent.Agent{
-			"tikz":       agent.NewTikZAgent(geminiClient, logger),
-			"matplotlib": agent.NewMatplotlibAgent(geminiClient),
-			"mermaid":    agent.NewMermaidAgent(geminiClient),
-		}
-		routerAgent := agent.NewRouterAgent(geminiClient, logger)
-
-		agentSvc := service.NewAgentService(geminiClient, renderSvc, generationSvc, store, agents, routerAgent, logger)
-
-		wsHub := ws.NewHub(logger)
-		generateHandler = handler.NewGenerateHandler(agentSvc, generationSvc, store, wsHub, logger)
-		colorExtractHandler = handler.NewColorExtractHandler(geminiClient, logger)
-		wsHandler = handler.NewWSHandler(wsHub, logger)
-	} else {
-		logger.Warn("GEMINI_API_KEY not set — AI generation endpoints disabled")
+	// LLM — always create (key may be set later via API)
+	geminiClient, err := llm.NewGeminiClient(context.Background(), cfg.GeminiAPIKey, cfg.GeminiModel)
+	if err != nil {
+		logger.Fatal("failed to create gemini client", zap.Error(err))
 	}
+	if cfg.GeminiAPIKey != "" {
+		logger.Info("gemini client ready", zap.String("model", cfg.GeminiModel))
+	} else {
+		logger.Warn("GEMINI_API_KEY not set — configure via UI or restart with env var")
+	}
+
+	agents := map[string]agent.Agent{
+		"tikz":       agent.NewTikZAgent(geminiClient, logger),
+		"matplotlib": agent.NewMatplotlibAgent(geminiClient),
+		"mermaid":    agent.NewMermaidAgent(geminiClient),
+	}
+	routerAgent := agent.NewRouterAgent(geminiClient, logger)
+
+	agentSvc := service.NewAgentService(geminiClient, renderSvc, generationSvc, store, agents, routerAgent, logger)
+
+	wsHub := ws.NewHub(logger)
+	generateHandler := handler.NewGenerateHandler(agentSvc, generationSvc, store, wsHub, logger, geminiClient)
+	colorExtractHandler := handler.NewColorExtractHandler(geminiClient, logger)
+	wsHandler := handler.NewWSHandler(wsHub, logger)
+	configHandler := handler.NewConfigHandler(geminiClient, cfg.GeminiModel)
 
 	// Router
 	r := router.Setup(router.Deps{
-		DB:                db,
-		Redis:             rdb,
-		Storage:           store,
+		DB:                  db,
+		Redis:               rdb,
+		Storage:             store,
 		ProjectHandler:      projectHandler,
 		GenerationHandler:   generationHandler,
 		RenderHandler:       renderHandler,
 		GenerateHandler:     generateHandler,
 		ColorExtractHandler: colorExtractHandler,
 		WSHandler:           wsHandler,
+		ConfigHandler:       configHandler,
 	})
 
 	// Start
