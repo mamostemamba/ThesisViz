@@ -128,7 +128,7 @@ Gemini Vision 自动检查生成图表的质量，发现问题自动修复，无
 **① 克隆项目**
 
 ```bash
-git clone https://github.com/your-username/ThesisViz.git
+git clone https://github.com/0xE1337/ThesisViz.git
 cd ThesisViz
 ```
 

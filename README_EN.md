@@ -128,7 +128,7 @@ Visual element highlighting helps you locate and manually adjust code with preci
 **① Clone the repository**
 
 ```bash
-git clone https://github.com/your-username/ThesisViz.git
+git clone https://github.com/0xE1337/ThesisViz.git
 cd ThesisViz
 ```
 
