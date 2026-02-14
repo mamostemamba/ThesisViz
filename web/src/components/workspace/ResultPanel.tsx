@@ -17,6 +17,7 @@ import {
 import { ImageLightbox } from "./ImageLightbox";
 import { MermaidRenderer } from "./MermaidRenderer";
 import { DiffViewer } from "./DiffViewer";
+import { TikZEditor, type HighlightState } from "./TikZEditor";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 
 export interface ImageSnapshot {
@@ -56,10 +57,30 @@ export function ResultPanel({
   fullTex,
 }: ResultPanelProps) {
   const colorScheme = useSettingsStore((s) => s.colorScheme);
+  const customColors = useSettingsStore((s) => s.customColors);
+  const language = useSettingsStore((s) => s.language);
+  const diagramStyle = useSettingsStore((s) => s.diagramStyle);
   const [modification, setModification] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const mermaidContainerRef = useRef<HTMLDivElement>(null);
+
+  // Editable state for TikZ fine-tuning
+  const [editedCode, setEditedCode] = useState<string | null>(null);
+  const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null);
+
+  // Highlight state for element location
+  const [highlightState, setHighlightState] = useState<HighlightState>({
+    loading: false,
+    imageUrl: null,
+  });
+
+  // Use edited values if available, otherwise fall back to props
+  const currentImageUrl = editedImageUrl || imageUrl;
+  const currentCode = editedCode || code;
+
+  // Display image: highlight overrides when available
+  const displayImageUrl = highlightState.imageUrl || currentImageUrl;
 
   const handleCopy = useCallback(
     async (label: string, text: string) => {
@@ -71,7 +92,7 @@ export function ResultPanel({
   );
 
   // Code panel and copy button use fullTex when available (Overleaf-ready)
-  const displayCode = fullTex || code;
+  const displayCode = fullTex || currentCode;
 
   const handleCopyCode = useCallback(() => {
     handleCopy("code", displayCode);
@@ -89,9 +110,9 @@ export function ResultPanel({
       link.download = "figure.png";
       link.href = dataUrl;
       link.click();
-    } else if (imageUrl) {
+    } else if (currentImageUrl) {
       // For TikZ/Matplotlib, download the server image
-      const response = await fetch(imageUrl);
+      const response = await fetch(currentImageUrl);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -100,7 +121,7 @@ export function ResultPanel({
       link.click();
       URL.revokeObjectURL(url);
     }
-  }, [format, imageUrl]);
+  }, [format, currentImageUrl]);
 
   const handleDownloadSVG = useCallback(() => {
     const svgEl = mermaidContainerRef.current?.querySelector("svg");
@@ -152,16 +173,29 @@ export function ResultPanel({
             <div ref={mermaidContainerRef}>
               <MermaidRenderer code={code} colorScheme={colorScheme} />
             </div>
-          ) : imageUrl ? (
+          ) : displayImageUrl ? (
             <div className="relative group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={imageUrl}
+                src={displayImageUrl}
                 alt="Generated figure"
-                className="max-h-[400px] w-full rounded border object-contain"
+                className={`max-h-[400px] w-full rounded border object-contain transition-all duration-300 ${
+                  highlightState.loading
+                    ? "border-red-300 opacity-70"
+                    : highlightState.imageUrl
+                      ? "border-red-400 border-2"
+                      : ""
+                }`}
               />
+              {highlightState.loading && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span className="animate-pulse rounded-full bg-red-500/20 px-3 py-1 text-xs font-medium text-red-600">
+                    定位中...
+                  </span>
+                </div>
+              )}
               <button
-                onClick={() => setLightboxSrc(imageUrl)}
+                onClick={() => setLightboxSrc(displayImageUrl)}
                 className="absolute top-2 right-2 rounded-md bg-black/50 p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/70"
                 title="放大查看"
               >
@@ -237,7 +271,7 @@ export function ResultPanel({
 
           {/* Export buttons */}
           <div className="flex flex-wrap gap-2">
-            {(imageUrl || format === "mermaid") && (
+            {(currentImageUrl || format === "mermaid") && (
               <Button variant="outline" size="sm" onClick={handleDownloadPNG}>
                 <Download className="mr-1 h-3 w-3" />
                 下载 PNG
@@ -276,6 +310,9 @@ export function ResultPanel({
                 {parentCode && (
                   <TabsTrigger value="diff">差异对比</TabsTrigger>
                 )}
+                {format === "tikz" && (
+                  <TabsTrigger value="editor">微调</TabsTrigger>
+                )}
               </TabsList>
             </div>
             <TabsContent value="code" className="mt-2">
@@ -295,6 +332,22 @@ export function ResultPanel({
             {parentCode && (
               <TabsContent value="diff" className="mt-2">
                 <DiffViewer oldCode={parentCode} newCode={code} />
+              </TabsContent>
+            )}
+            {format === "tikz" && (
+              <TabsContent value="editor" className="mt-2">
+                <TikZEditor
+                  code={currentCode}
+                  imageUrl={currentImageUrl}
+                  onCodeChange={setEditedCode}
+                  onImageChange={setEditedImageUrl}
+                  onHighlightChange={setHighlightState}
+                  format={format}
+                  language={language}
+                  colorScheme={colorScheme}
+                  customColors={colorScheme === "custom" && customColors ? customColors : undefined}
+                  diagramStyle={diagramStyle}
+                />
               </TabsContent>
             )}
           </Tabs>

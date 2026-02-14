@@ -75,8 +75,7 @@ func RouterDrawingPrompt(language, thesisTitle, thesisAbstract, colorDefs string
 - 不要使用各种难懂抽象的词语
 - 不要使用夸大词语
 - 需要非常详细的画图指令
-- 需要流畅，有逻辑
-- 图不要设计的太宽`
+- 需要流畅，有逻辑`
 	}
 
 	thesisBlock := ""

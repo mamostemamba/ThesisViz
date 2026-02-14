@@ -307,13 +307,6 @@ export function Sidebar() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="drawio">Draw.io 经典</SelectItem>
-              <SelectItem value="professional_blue">专业蓝</SelectItem>
-              <SelectItem value="bold_contrast">高对比</SelectItem>
-              <SelectItem value="minimal_mono">极简黑白</SelectItem>
-              <SelectItem value="modern_teal">现代青</SelectItem>
-              <SelectItem value="soft_pastel">柔和粉彩</SelectItem>
-              <SelectItem value="warm_earth">暖色大地</SelectItem>
-              <SelectItem value="cyber_dark">深色科技</SelectItem>
               <SelectItem value="custom">自定义</SelectItem>
             </SelectContent>
           </Select>
@@ -503,25 +496,6 @@ export function Sidebar() {
           </Select>
         </div>
 
-        {format === "tikz" && (
-          <div>
-            <label className="mb-2 block text-sm font-medium">图表风格</label>
-            <Select
-              value={diagramStyle}
-              onValueChange={(v) =>
-                setDiagramStyle(v as "professional" | "handdrawn")
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="professional">专业 (Professional)</SelectItem>
-                <SelectItem value="handdrawn">手绘 (Hand-drawn)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
 
         <div>
           <label className="mb-2 block text-sm font-medium">状态</label>
